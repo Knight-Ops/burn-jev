@@ -1,0 +1,5 @@
+/target
+# Model weights and derived feature caches (large, reproducible)
+models/**/*.safetensors
+models/_archive/
+data/.cache/

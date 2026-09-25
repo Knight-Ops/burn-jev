@@ -1,0 +1,1745 @@
+cargo run --release --bin reflex-train -- --backbone models/mamba2-370m-hf.safetensors --tokenizer models/tokenizer.json --train data/reflex_training_data.jsonl --val data/reflex_validation_data.jsonl --out models/reflex_heads.safetensors --seed 42 --epochs 150 --backend wgpu --batch-size 16 --lr 0.01
+    Finished `release` profile [optimized] target(s) in 0.24s
+     Running `target/release/reflex-train --backbone models/mamba2-370m-hf.safetensors --tokenizer models/tokenizer.json --train data/reflex_training_data.jsonl --val data/reflex_validation_data.jsonl --out models/reflex_heads.safetensors --seed 42 --epochs 150 --backend wgpu --batch-size 16 --lr 0.01`
+[dataset] 1858 scenarios from data/reflex_training_data.jsonl
+[dataset] 228 scenarios from data/reflex_validation_data.jsonl
+[backbone] loading models/mamba2-370m-hf.safetensors (backend wgpu)
+[backbone] d_model=1024 layers=48 vocab=50288 (368346624 parameters, sha256 0003c9888848029aaeef515c0e5ffade35a66a14050f3e2d642f46a90dd70463)
+[features] 1858 scenarios loaded from cache in 0.24s
+
+[train] Adam lr=0.01 epochs=150 batch=16 seed=Some(42)
+ Epoch | Total Loss | Choice Loss | Noul Loss | Score Loss | Metric Loss | Calib Loss
+-------+------------+-------------+-----------+------------+-------------+-----------
+     1 |     4.7934 |      1.7785 |    0.8542 |     0.7068 |      0.8272 |     0.2745
+    10 |     2.3363 |      0.7494 |    0.4399 |     0.4657 |      0.5802 |     0.1436
+    20 |     1.0197 |      0.1544 |    0.2602 |     0.3547 |      0.2674 |     0.0817
+    30 |     0.9155 |      0.2161 |    0.1797 |     0.2953 |      0.1506 |     0.0566
+    40 |     0.7286 |      0.1148 |    0.1701 |     0.2834 |      0.0729 |     0.0531
+    50 |     0.6272 |      0.0586 |    0.1718 |     0.2644 |      0.0694 |     0.0511
+    60 |     0.5498 |      0.0394 |    0.1496 |     0.2493 |      0.0792 |     0.0452
+    70 |     0.5230 |      0.0359 |    0.1363 |     0.2438 |      0.1275 |     0.0405
+    80 |     0.4903 |      0.0221 |    0.1473 |     0.2233 |      0.0435 |     0.0422
+    90 |     0.4296 |      0.0219 |    0.1145 |     0.2153 |      0.0295 |     0.0337
+   100 |     0.4298 |      0.0168 |    0.1172 |     0.2168 |      0.0551 |     0.0329
+   110 |     0.5027 |      0.0886 |    0.1000 |     0.2075 |      0.0664 |     0.0288
+   120 |     0.3817 |      0.0068 |    0.1041 |     0.2061 |      0.0332 |     0.0291
+   130 |     0.3414 |      0.0020 |    0.0871 |     0.1981 |      0.0475 |     0.0248
+   140 |     0.4164 |      0.0116 |    0.1275 |     0.1989 |      0.0243 |     0.0324
+   150 |     0.3340 |      0.0048 |    0.0864 |     0.1880 |      0.0463 |     0.0228
+[train] done in 34760.60s
+
+[export] heads -> models/reflex_heads.safetensors (8727.05 KB)
+
+=== Validation ===
+
+--- dataml_val_0014 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 91.92%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.97%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 50.48%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 2.40 (diff 1.40)
+  [Score Q2] target 3.70 vs predicted 1.78 (diff 1.92)
+
+--- distsys_val_0023 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 61.04%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.06%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 65.69%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 99.94%) -> PASS
+  [Score Q1] target 4.20 vs predicted 4.27 (diff 0.07)
+  [Score Q2] target 4.00 vs predicted 1.93 (diff 2.07)
+
+--- cloudiam_val_0022 [security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 89.26%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 70.81%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 89.27%) -> PASS
+  [Score Q1] target 1.60 vs predicted 1.68 (diff 0.08)
+  [Score Q2] target 1.80 vs predicted 1.69 (diff 0.11)
+
+--- dataml_val_0009 [data_ml] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 50.88%) -> PASS
+  [Score Q1] target 3.80 vs predicted 3.36 (diff 0.44)
+  [Score Q2] target 3.60 vs predicted 4.06 (diff 0.46)
+
+--- supplychain_val_0013 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 68.22%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 7.91%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 1.60 vs predicted 3.00 (diff 1.40)
+  [Score Q2] target 2.50 vs predicted 1.50 (diff 1.00)
+
+--- cloudiam_val_0016 [security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 60.50%) -> FAIL
+  [Choice Q2] target option 3 vs predicted option 4 (confidence 99.43%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 25.63%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 89.98%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.58%) -> PASS
+  [Score Q1] target 4.80 vs predicted 2.00 (diff 2.80)
+  [Score Q2] target 4.70 vs predicted 3.77 (diff 0.93)
+
+--- websec_val_0017 [security] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 66.84%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 63.35%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 50.88%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 1.70 vs predicted 3.49 (diff 1.79)
+
+--- websec_val_0023 [security] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 99.83%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.81%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 78.80%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 2.84 (diff 1.54)
+  [Score Q2] target 4.40 vs predicted 2.62 (diff 1.78)
+
+--- llmsec_val_0003 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 92.15%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 87.50%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 96.05%) -> FAIL
+  [Score Q1] target 1.20 vs predicted 1.90 (diff 0.70)
+  [Score Q2] target 2.60 vs predicted 1.47 (diff 1.13)
+
+--- dataml_val_0022 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 48.81%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 3.69%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.73%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 1.75 (diff 2.85)
+  [Score Q2] target 4.50 vs predicted 4.52 (diff 0.02)
+
+--- distsys_val_0010 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 99.99%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 99.10%) -> FAIL
+  [Score Q1] target 1.70 vs predicted 2.41 (diff 0.71)
+  [Score Q2] target 1.30 vs predicted 3.03 (diff 1.73)
+
+--- val_db_replica_003 [devops] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.07%) -> PASS
+  [Score Q1] target 4.10 vs predicted 2.81 (diff 1.29)
+  [Score Q2] target 1.40 vs predicted 4.25 (diff 2.85)
+
+--- devops_val_0014 [devops] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 73.84%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 77.09%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 25.85%) -> FAIL
+  [Score Q1] target 2.80 vs predicted 4.04 (diff 1.24)
+  [Score Q2] target 2.60 vs predicted 4.27 (diff 1.67)
+
+--- cloudiam_val_0012 [security] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 99.98%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 91.77%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 1.20 vs predicted 1.62 (diff 0.42)
+
+--- llmsec_val_0004 [llm_security] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 93.85%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 31.46%) -> PASS
+  [Score Q1] target 3.90 vs predicted 3.60 (diff 0.30)
+  [Score Q2] target 3.80 vs predicted 1.72 (diff 2.08)
+
+--- dataml_val_0003 [data_ml] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.06%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.06%) -> PASS
+  [Score Q1] target 1.90 vs predicted 1.98 (diff 0.08)
+
+--- network_val_0016 [networking] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.93%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 3.51 (diff 0.99)
+  [Score Q2] target 4.40 vs predicted 3.81 (diff 0.59)
+
+--- websec_val_0018 [security] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.84%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 3.09 (diff 1.31)
+  [Score Q2] target 4.70 vs predicted 3.92 (diff 0.78)
+
+--- fintech_val_0004 [fintech] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 63.07%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 64.20%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 62.74%) -> PASS
+  [Score Q1] target 3.10 vs predicted 4.70 (diff 1.60)
+  [Score Q2] target 1.90 vs predicted 4.03 (diff 2.13)
+
+--- dataml_val_0023 [data_ml] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 0.31%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.85%) -> PASS
+  [Score Q1] target 1.50 vs predicted 4.59 (diff 3.09)
+
+--- supplychain_val_0005 [supply_chain] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 92.78%) -> FAIL
+  [Choice Q2] target option 2 vs predicted option 3 (confidence 99.67%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 4.30 vs predicted 1.55 (diff 2.75)
+  [Score Q2] target 4.10 vs predicted 3.98 (diff 0.12)
+
+--- network_val_0013 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 5.89%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 17.36%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 99.25%) -> FAIL
+  [Score Q1] target 3.60 vs predicted 4.20 (diff 0.60)
+  [Score Q2] target 2.80 vs predicted 4.22 (diff 1.42)
+
+--- devops_val_0023 [devops] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.93%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.62%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 4.86 (diff 0.26)
+  [Score Q2] target 4.50 vs predicted 3.61 (diff 0.89)
+
+--- cloudiam_val_0018 [security] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.01%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 4.50 vs predicted 4.22 (diff 0.28)
+  [Score Q2] target 4.30 vs predicted 2.75 (diff 1.55)
+
+--- cloudiam_val_0019 [security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 0.01%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.91%) -> PASS
+  [Score Q1] target 1.50 vs predicted 1.39 (diff 0.11)
+  [Score Q2] target 1.20 vs predicted 2.48 (diff 1.28)
+
+--- dataml_val_0018 [data_ml] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 99.99%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.66%) -> PASS
+  [Score Q1] target 3.50 vs predicted 1.94 (diff 1.56)
+  [Score Q2] target 3.20 vs predicted 4.02 (diff 0.82)
+
+--- dataml_val_0007 [data_ml] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 4.00 vs predicted 3.87 (diff 0.13)
+
+--- network_val_0003 [networking] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 68.69%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 2.51 (diff 1.29)
+  [Score Q2] target 3.60 vs predicted 3.97 (diff 0.37)
+
+--- val_sec_xxe_002 [security] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 80.92%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 99.94%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 32.80%) -> PASS
+  [Score Q1] target 4.90 vs predicted 2.08 (diff 2.82)
+  [Score Q2] target 4.80 vs predicted 2.02 (diff 2.78)
+
+--- llmsec_val_0018 [llm_security] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 4.56%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 91.32%) -> FAIL
+  [Score Q1] target 4.80 vs predicted 3.79 (diff 1.01)
+  [Score Q2] target 4.90 vs predicted 3.94 (diff 0.96)
+
+--- fintech_val_0009 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 97.75%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 83.63%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 1.30 vs predicted 1.46 (diff 0.16)
+  [Score Q2] target 3.20 vs predicted 4.01 (diff 0.81)
+
+--- cloudiam_val_0002 [security] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.80%) -> FAIL
+  [Choice Q2] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 28.85%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.88%) -> FAIL
+  [Score Q1] target 2.40 vs predicted 4.03 (diff 1.63)
+  [Score Q2] target 1.90 vs predicted 2.02 (diff 0.12)
+
+--- supplychain_val_0019 [supply_chain] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Choice Q2] target option 4 vs predicted option 1 (confidence 92.68%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 5.00 vs predicted 2.25 (diff 2.75)
+  [Score Q2] target 4.30 vs predicted 1.44 (diff 2.86)
+
+--- devops_val_0017 [devops] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 0.18%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.70 vs predicted 1.66 (diff 3.04)
+  [Score Q2] target 4.20 vs predicted 4.09 (diff 0.11)
+
+--- distsys_val_0003 [distributed_systems] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 77.30%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.74%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 98.53%) -> FAIL
+  [Score Q1] target 2.20 vs predicted 1.30 (diff 0.90)
+  [Score Q2] target 1.80 vs predicted 4.20 (diff 2.40)
+
+--- dataml_val_0019 [data_ml] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 94.82%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 76.24%) -> FAIL
+  [Score Q1] target 1.60 vs predicted 4.09 (diff 2.49)
+
+--- devops_val_0016 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.10%) -> PASS
+  [Score Q1] target 2.00 vs predicted 2.00 (diff 0.00)
+  [Score Q2] target 1.60 vs predicted 3.58 (diff 1.98)
+
+--- distsys_val_0022 [distributed_systems] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.16%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 38.70%) -> PASS
+  [Score Q1] target 1.60 vs predicted 1.86 (diff 0.26)
+  [Score Q2] target 1.40 vs predicted 3.99 (diff 2.59)
+
+--- llmsec_val_0014 [llm_security] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 99.91%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 4.60 vs predicted 3.93 (diff 0.67)
+  [Score Q2] target 4.70 vs predicted 2.52 (diff 2.18)
+
+--- devops_val_0009 [devops] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 99.97%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 3.07%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.04%) -> PASS
+  [Score Q1] target 1.60 vs predicted 3.96 (diff 2.36)
+  [Score Q2] target 2.20 vs predicted 2.46 (diff 0.26)
+
+--- fintech_val_0017 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 97.07%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 60.19%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 1.96 (diff 1.84)
+  [Score Q2] target 2.10 vs predicted 3.60 (diff 1.50)
+
+--- supplychain_val_0021 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.88%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 20.06%) -> PASS
+  [Score Q1] target 4.40 vs predicted 1.95 (diff 2.45)
+  [Score Q2] target 4.30 vs predicted 1.09 (diff 3.21)
+
+--- websec_val_0012 [security] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 89.97%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.22%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 3.31%) -> PASS
+  [Score Q1] target 2.30 vs predicted 3.96 (diff 1.66)
+  [Score Q2] target 1.10 vs predicted 1.83 (diff 0.73)
+
+--- fintech_val_0011 [fintech] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.98%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.02%) -> FAIL
+  [Score Q1] target 1.40 vs predicted 4.67 (diff 3.27)
+  [Score Q2] target 2.80 vs predicted 4.00 (diff 1.20)
+
+--- supplychain_val_0003 [supply_chain] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 99.11%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 99.97%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.10%) -> PASS
+  [Score Q1] target 4.60 vs predicted 1.73 (diff 2.87)
+  [Score Q2] target 4.40 vs predicted 1.25 (diff 3.15)
+
+--- distsys_val_0013 [distributed_systems] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 96.79%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 4.14%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 0.18%) -> FAIL
+  [Score Q1] target 4.30 vs predicted 2.71 (diff 1.59)
+  [Score Q2] target 4.20 vs predicted 3.23 (diff 0.97)
+
+--- llmsec_val_0005 [llm_security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 4.16%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 39.13%) -> PASS
+  [Score Q1] target 4.40 vs predicted 1.63 (diff 2.77)
+  [Score Q2] target 4.20 vs predicted 4.07 (diff 0.13)
+
+--- llmsec_val_0025 [llm_security] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.95%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 1.13%) -> PASS
+  [Score Q1] target 1.20 vs predicted 4.34 (diff 3.14)
+  [Score Q2] target 3.30 vs predicted 2.29 (diff 1.01)
+
+--- supplychain_val_0008 [supply_chain] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 97.30%) -> FAIL
+  [Choice Q2] target option 1 vs predicted option 1 (confidence 99.84%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 99.95%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 3.70 vs predicted 4.54 (diff 0.84)
+  [Score Q2] target 4.30 vs predicted 2.19 (diff 2.11)
+
+--- dataml_val_0008 [data_ml] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.58%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 1.20 vs predicted 1.85 (diff 0.65)
+
+--- supplychain_val_0001 [supply_chain] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 93.09%) -> FAIL
+  [Choice Q2] target option 2 vs predicted option 2 (confidence 97.64%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.05%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 2.23 (diff 2.27)
+  [Score Q2] target 3.60 vs predicted 1.57 (diff 2.03)
+
+--- dataml_val_0017 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 20.34%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.80%) -> FAIL
+  [Score Q1] target 1.90 vs predicted 2.37 (diff 0.47)
+
+--- supplychain_val_0024 [supply_chain] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 60.26%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.13%) -> PASS
+  [Score Q1] target 1.20 vs predicted 1.36 (diff 0.16)
+  [Score Q2] target 1.50 vs predicted 2.17 (diff 0.67)
+
+--- devops_val_0007 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 85.61%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 90.71%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 49.84%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 4.70 vs predicted 3.57 (diff 1.13)
+  [Score Q2] target 4.50 vs predicted 3.45 (diff 1.05)
+
+--- fintech_val_0022 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 97.69%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 26.97%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 2.90 vs predicted 4.69 (diff 1.79)
+  [Score Q2] target 3.30 vs predicted 3.09 (diff 0.21)
+
+--- devops_val_0004 [devops] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 97.97%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 86.32%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.99%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 71.14%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 2.57 (diff 1.93)
+  [Score Q2] target 4.30 vs predicted 4.01 (diff 0.29)
+
+--- devops_val_0002 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.98%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.97%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 2.88 (diff 1.72)
+  [Score Q2] target 4.40 vs predicted 1.68 (diff 2.72)
+
+--- websec_val_0019 [security] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 1.98%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 3.20%) -> PASS
+  [Score Q1] target 1.40 vs predicted 3.89 (diff 2.49)
+  [Score Q2] target 4.50 vs predicted 4.05 (diff 0.45)
+
+--- cloudiam_val_0009 [security] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.96%) -> FAIL
+  [Score Q1] target 4.10 vs predicted 3.48 (diff 0.62)
+  [Score Q2] target 2.70 vs predicted 2.04 (diff 0.66)
+
+--- supplychain_val_0017 [supply_chain] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 89.57%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 23.23%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.30 vs predicted 3.15 (diff 1.15)
+  [Score Q2] target 4.20 vs predicted 1.76 (diff 2.44)
+
+--- network_val_0009 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 81.63%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.89%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.97%) -> FAIL
+  [Score Q1] target 3.60 vs predicted 1.67 (diff 1.93)
+  [Score Q2] target 3.40 vs predicted 2.04 (diff 1.36)
+
+--- websec_val_0005 [security] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 99.56%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.91%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 56.82%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 1.74 (diff 2.66)
+  [Score Q2] target 4.40 vs predicted 3.98 (diff 0.42)
+
+--- distsys_val_0014 [distributed_systems] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 59.46%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 50.66%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 2.12%) -> PASS
+  [Score Q1] target 1.90 vs predicted 4.05 (diff 2.15)
+  [Score Q2] target 1.50 vs predicted 1.27 (diff 0.23)
+
+--- network_val_0005 [networking] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.10%) -> FAIL
+  [Score Q1] target 1.60 vs predicted 4.95 (diff 3.35)
+  [Score Q2] target 1.00 vs predicted 4.26 (diff 3.26)
+
+--- fintech_val_0025 [fintech] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 89.90%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 1.59%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 23.38%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.40%) -> PASS
+  [Score Q1] target 4.30 vs predicted 1.77 (diff 2.53)
+  [Score Q2] target 1.90 vs predicted 4.15 (diff 2.25)
+
+--- llmsec_val_0008 [llm_security] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 94.54%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.64%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 4.77 (diff 3.47)
+  [Score Q2] target 3.40 vs predicted 2.46 (diff 0.94)
+
+--- distsys_val_0007 [distributed_systems] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 85.99%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 98.64%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 46.16%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 37.14%) -> PASS
+  [Score Q1] target 2.00 vs predicted 4.52 (diff 2.52)
+  [Score Q2] target 1.50 vs predicted 1.89 (diff 0.39)
+
+--- cloudiam_val_0007 [security] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 98.99%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.75%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.53%) -> PASS
+  [Score Q1] target 4.70 vs predicted 3.13 (diff 1.57)
+  [Score Q2] target 4.60 vs predicted 4.04 (diff 0.56)
+
+--- devops_val_0008 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 99.98%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 8.03%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 1.05%) -> PASS
+  [Score Q1] target 4.50 vs predicted 1.34 (diff 3.16)
+  [Score Q2] target 4.40 vs predicted 2.85 (diff 1.55)
+
+--- devops_val_0006 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.32%) -> PASS
+  [Score Q1] target 1.70 vs predicted 2.80 (diff 1.10)
+  [Score Q2] target 1.90 vs predicted 4.07 (diff 2.17)
+
+--- llmsec_val_0021 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 98.63%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 0.01%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.94%) -> PASS
+  [Score Q1] target 2.50 vs predicted 3.51 (diff 1.01)
+  [Score Q2] target 1.00 vs predicted 3.10 (diff 2.10)
+
+--- websec_val_0015 [security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 89.67%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 0.90%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 96.74%) -> FAIL
+  [Score Q1] target 1.10 vs predicted 2.21 (diff 1.11)
+
+--- dataml_val_0024 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 47.77%) -> PASS
+  [Score Q1] target 3.40 vs predicted 3.55 (diff 0.15)
+  [Score Q2] target 3.30 vs predicted 1.39 (diff 1.91)
+
+--- websec_val_0007 [security] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 90.41%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 1.20 vs predicted 1.99 (diff 0.79)
+
+--- fintech_val_0010 [fintech] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 91.13%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 4.90 vs predicted 3.63 (diff 1.27)
+  [Score Q2] target 4.30 vs predicted 3.26 (diff 1.04)
+
+--- distsys_val_0005 [distributed_systems] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 99.69%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.35%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.82%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 99.78%) -> PASS
+  [Score Q1] target 4.50 vs predicted 2.70 (diff 1.80)
+  [Score Q2] target 4.30 vs predicted 2.66 (diff 1.64)
+
+--- network_val_0008 [networking] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 77.97%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 98.33%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.99%) -> FAIL
+  [Score Q1] target 1.80 vs predicted 4.52 (diff 2.72)
+  [Score Q2] target 1.50 vs predicted 3.35 (diff 1.85)
+
+--- fintech_val_0008 [fintech] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 99.81%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 37.98%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 2.03%) -> FAIL
+  [Score Q1] target 4.30 vs predicted 2.10 (diff 2.20)
+  [Score Q2] target 3.40 vs predicted 1.59 (diff 1.81)
+
+--- websec_val_0025 [security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 71.55%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 72.85%) -> PASS
+  [Score Q1] target 1.10 vs predicted 3.32 (diff 2.22)
+
+--- dataml_val_0010 [data_ml] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 99.60%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 14.16%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 81.42%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 38.26%) -> PASS
+  [Score Q1] target 3.90 vs predicted 4.02 (diff 0.12)
+  [Score Q2] target 4.00 vs predicted 4.05 (diff 0.05)
+
+--- supplychain_val_0006 [supply_chain] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 99.88%) -> FAIL
+  [Choice Q2] target option 2 vs predicted option 2 (confidence 85.09%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 47.86%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 3.12 (diff 1.28)
+  [Score Q2] target 3.40 vs predicted 1.32 (diff 2.08)
+
+--- cloudiam_val_0025 [security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 92.36%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 6.20%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 3.46%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 3.03 (diff 1.73)
+  [Score Q2] target 2.10 vs predicted 3.97 (diff 1.87)
+
+--- network_val_0011 [networking] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 99.91%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 84.48%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.00 vs predicted 2.49 (diff 1.51)
+  [Score Q2] target 3.80 vs predicted 4.01 (diff 0.21)
+
+--- llmsec_val_0010 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 81.69%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.99%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 76.04%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 4.43 (diff 0.03)
+  [Score Q2] target 4.30 vs predicted 1.81 (diff 2.49)
+
+--- supplychain_val_0025 [supply_chain] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 99.93%) -> FAIL
+  [Choice Q2] target option 1 vs predicted option 4 (confidence 99.78%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 13.31%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 9.90%) -> PASS
+  [Score Q1] target 4.50 vs predicted 3.96 (diff 0.54)
+  [Score Q2] target 4.30 vs predicted 3.98 (diff 0.32)
+
+--- network_val_0020 [networking] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 1.63 (diff 2.87)
+  [Score Q2] target 4.60 vs predicted 3.24 (diff 1.36)
+
+--- websec_val_0021 [security] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 91.57%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.08%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.99%) -> FAIL
+  [Score Q1] target 1.60 vs predicted 4.01 (diff 2.41)
+  [Score Q2] target 4.40 vs predicted 2.69 (diff 1.71)
+
+--- fintech_val_0015 [fintech] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.02%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 37.88%) -> FAIL
+  [Score Q1] target 1.80 vs predicted 1.93 (diff 0.13)
+  [Score Q2] target 4.60 vs predicted 1.47 (diff 3.13)
+
+--- llmsec_val_0007 [llm_security] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 44.38%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 93.93%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 90.67%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 1.27 (diff 2.53)
+  [Score Q2] target 4.00 vs predicted 1.66 (diff 2.34)
+
+--- llmsec_val_0020 [llm_security] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted false (prob 1.76%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 98.80%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 1.93 (diff 2.57)
+  [Score Q2] target 4.40 vs predicted 2.37 (diff 2.03)
+
+--- supplychain_val_0015 [supply_chain] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 2.96 (diff 1.54)
+  [Score Q2] target 1.20 vs predicted 1.63 (diff 0.43)
+
+--- llmsec_val_0002 [llm_security] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 53.44%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 90.19%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 4.00 vs predicted 2.00 (diff 2.00)
+  [Score Q2] target 3.70 vs predicted 1.33 (diff 2.37)
+
+--- cloudiam_val_0017 [security] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 55.13%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 1.10 vs predicted 4.03 (diff 2.93)
+  [Score Q2] target 4.50 vs predicted 4.02 (diff 0.48)
+
+--- devops_val_0005 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 99.91%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 74.00%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 1.81 (diff 2.59)
+  [Score Q2] target 4.30 vs predicted 3.66 (diff 0.64)
+
+--- fintech_val_0013 [fintech] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 47.13%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 99.31%) -> FAIL
+  [Score Q1] target 1.40 vs predicted 2.83 (diff 1.43)
+  [Score Q2] target 1.60 vs predicted 1.86 (diff 0.26)
+
+--- fintech_val_0012 [fintech] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 99.98%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 94.21%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 98.53%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q4] target false vs predicted true (prob 99.74%) -> FAIL
+  [Score Q1] target 4.10 vs predicted 3.46 (diff 0.64)
+  [Score Q2] target 3.70 vs predicted 3.02 (diff 0.68)
+
+--- llmsec_val_0009 [llm_security] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 99.79%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 41.12%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 3.50 vs predicted 2.94 (diff 0.56)
+  [Score Q2] target 3.60 vs predicted 2.10 (diff 1.50)
+
+--- fintech_val_0014 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 49.69%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.01%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.02%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 74.25%) -> FAIL
+  [Score Q1] target 3.50 vs predicted 3.23 (diff 0.27)
+  [Score Q2] target 3.00 vs predicted 2.86 (diff 0.14)
+
+--- dataml_val_0021 [data_ml] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 99.90%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 1.20%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 1.70 vs predicted 4.17 (diff 2.47)
+
+--- websec_val_0016 [security] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 99.66%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.06%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.96%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 3.90 vs predicted 3.56 (diff 0.34)
+  [Score Q2] target 4.00 vs predicted 3.74 (diff 0.26)
+
+--- devops_val_0003 [devops] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 86.93%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 15.21%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 4.86%) -> PASS
+  [Score Q1] target 1.50 vs predicted 3.62 (diff 2.12)
+  [Score Q2] target 1.30 vs predicted 3.16 (diff 1.86)
+
+--- websec_val_0024 [security] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 81.11%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.10 vs predicted 3.22 (diff 0.88)
+  [Score Q2] target 2.80 vs predicted 1.39 (diff 1.41)
+
+--- distsys_val_0011 [distributed_systems] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.59%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.13%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.08%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.10 vs predicted 1.50 (diff 2.60)
+  [Score Q2] target 4.00 vs predicted 2.37 (diff 1.63)
+
+--- distsys_val_0017 [distributed_systems] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 62.63%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.33%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.94%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 9.94%) -> PASS
+  [Score Q1] target 3.60 vs predicted 4.65 (diff 1.05)
+  [Score Q2] target 3.70 vs predicted 3.84 (diff 0.14)
+
+--- devops_val_0018 [devops] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 99.99%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 89.32%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.70%) -> PASS
+  [Score Q1] target 1.20 vs predicted 2.02 (diff 0.82)
+  [Score Q2] target 1.10 vs predicted 3.18 (diff 2.08)
+
+--- llmsec_val_0006 [llm_security] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 26.88%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 4.10 vs predicted 3.30 (diff 0.80)
+  [Score Q2] target 3.90 vs predicted 2.13 (diff 1.77)
+
+--- fintech_val_0001 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 100.00%) -> PASS
+  [Choice Q2] target option 1 vs predicted option 1 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.70 vs predicted 3.51 (diff 1.19)
+  [Score Q2] target 4.50 vs predicted 2.07 (diff 2.43)
+
+--- distsys_val_0015 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.98%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 4.60 vs predicted 3.45 (diff 1.15)
+  [Score Q2] target 4.20 vs predicted 2.47 (diff 1.73)
+
+--- llmsec_val_0012 [llm_security] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 97.72%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 1.12 (diff 0.18)
+  [Score Q2] target 4.50 vs predicted 2.98 (diff 1.52)
+
+--- network_val_0023 [networking] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 39.69%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 96.07%) -> FAIL
+  [Score Q1] target 3.00 vs predicted 3.60 (diff 0.60)
+  [Score Q2] target 1.40 vs predicted 2.31 (diff 0.91)
+
+--- distsys_val_0024 [distributed_systems] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 68.80%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.92%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 99.92%) -> FAIL
+  [Score Q1] target 2.00 vs predicted 2.70 (diff 0.70)
+  [Score Q2] target 1.50 vs predicted 3.22 (diff 1.72)
+
+--- websec_val_0014 [security] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 99.45%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.84%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 2.43 (diff 1.97)
+  [Score Q2] target 3.80 vs predicted 2.97 (diff 0.83)
+
+--- network_val_0002 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 89.12%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 96.08%) -> FAIL
+  [Score Q1] target 2.60 vs predicted 2.01 (diff 0.59)
+  [Score Q2] target 1.80 vs predicted 4.08 (diff 2.28)
+
+--- fintech_val_0024 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 91.41%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.15%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 24.84%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.59%) -> FAIL
+  [Score Q1] target 1.20 vs predicted 4.30 (diff 3.10)
+  [Score Q2] target 1.10 vs predicted 4.02 (diff 2.92)
+
+--- llmsec_val_0016 [llm_security] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 88.91%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.30 vs predicted 2.87 (diff 1.43)
+  [Score Q2] target 4.20 vs predicted 4.17 (diff 0.03)
+
+--- cloudiam_val_0013 [security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 68.21%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 4.84%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 23.78%) -> PASS
+  [Score Q1] target 4.60 vs predicted 1.81 (diff 2.79)
+  [Score Q2] target 4.70 vs predicted 3.92 (diff 0.78)
+
+--- supplychain_val_0018 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 4.26%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 50.88%) -> PASS
+  [Score Q1] target 1.40 vs predicted 2.69 (diff 1.29)
+  [Score Q2] target 1.30 vs predicted 4.17 (diff 2.87)
+
+--- devops_val_0013 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 81.06%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 17.51%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 53.50%) -> FAIL
+  [Score Q1] target 1.80 vs predicted 1.70 (diff 0.10)
+  [Score Q2] target 1.40 vs predicted 2.43 (diff 1.03)
+
+--- distsys_val_0009 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 99.32%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 67.21%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 95.52%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 1.60 vs predicted 2.44 (diff 0.84)
+  [Score Q2] target 1.30 vs predicted 3.01 (diff 1.71)
+
+--- dataml_val_0005 [data_ml] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 89.61%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 92.38%) -> FAIL
+  [Score Q1] target 2.00 vs predicted 2.15 (diff 0.15)
+
+--- cloudiam_val_0004 [security] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 98.52%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.05%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.13%) -> PASS
+  [Score Q1] target 1.20 vs predicted 2.87 (diff 1.67)
+  [Score Q2] target 1.70 vs predicted 2.62 (diff 0.92)
+
+--- cloudiam_val_0014 [security] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 68.24%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 1.30 vs predicted 1.66 (diff 0.36)
+  [Score Q2] target 4.40 vs predicted 4.16 (diff 0.24)
+
+--- supplychain_val_0010 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 99.91%) -> FAIL
+  [Choice Q2] target option 3 vs predicted option 4 (confidence 99.83%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.99%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 78.55%) -> PASS
+  [Score Q1] target 4.50 vs predicted 2.74 (diff 1.76)
+  [Score Q2] target 4.40 vs predicted 2.72 (diff 1.68)
+
+--- fintech_val_0006 [fintech] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 99.07%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.49%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 61.24%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 99.99%) -> PASS
+  [Score Q1] target 4.40 vs predicted 1.95 (diff 2.45)
+  [Score Q2] target 2.30 vs predicted 2.36 (diff 0.06)
+
+--- cloudiam_val_0003 [security] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 98.85%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.27%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 4.80 vs predicted 2.06 (diff 2.74)
+  [Score Q2] target 4.70 vs predicted 2.27 (diff 2.43)
+
+--- supplychain_val_0009 [supply_chain] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 99.82%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 99.95%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 97.06%) -> PASS
+  [Score Q1] target 1.40 vs predicted 4.67 (diff 3.27)
+  [Score Q2] target 2.30 vs predicted 2.24 (diff 0.06)
+
+--- websec_val_0022 [security] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 51.57%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.94%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 50.85%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 4.04 (diff 0.36)
+  [Score Q2] target 3.90 vs predicted 4.02 (diff 0.12)
+
+--- dataml_val_0012 [data_ml] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 91.70%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.84%) -> FAIL
+  [Score Q1] target 3.70 vs predicted 4.08 (diff 0.38)
+
+--- distsys_val_0020 [distributed_systems] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 80.08%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 1.80 vs predicted 2.24 (diff 0.44)
+  [Score Q2] target 1.40 vs predicted 1.93 (diff 0.53)
+
+--- dataml_val_0025 [data_ml] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.97%) -> FAIL
+  [Score Q1] target 1.40 vs predicted 3.03 (diff 1.63)
+
+--- devops_val_0021 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 63.29%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 4.80 vs predicted 2.24 (diff 2.56)
+  [Score Q2] target 4.70 vs predicted 1.62 (diff 3.08)
+
+--- dataml_val_0011 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 99.90%) -> FAIL
+  [Score Q1] target 2.30 vs predicted 2.79 (diff 0.49)
+
+--- supplychain_val_0016 [supply_chain] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 3.68 (diff 2.38)
+  [Score Q2] target 2.80 vs predicted 3.24 (diff 0.44)
+
+--- network_val_0015 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.77%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.60%) -> FAIL
+  [Score Q1] target 3.00 vs predicted 2.81 (diff 0.19)
+  [Score Q2] target 2.40 vs predicted 2.11 (diff 0.29)
+
+--- fintech_val_0021 [fintech] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 99.93%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.99%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 1.92%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 1.43 (diff 2.97)
+  [Score Q2] target 3.60 vs predicted 4.35 (diff 0.75)
+
+--- devops_val_0020 [devops] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 50.88%) -> PASS
+  [Score Q1] target 2.10 vs predicted 4.15 (diff 2.05)
+  [Score Q2] target 1.90 vs predicted 4.12 (diff 2.22)
+
+--- cloudiam_val_0008 [security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.06%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 24.97%) -> FAIL
+  [Score Q1] target 1.10 vs predicted 3.48 (diff 2.38)
+  [Score Q2] target 4.20 vs predicted 4.10 (diff 0.10)
+
+--- llmsec_val_0022 [llm_security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 63.58%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 85.16%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 2.40 (diff 1.40)
+  [Score Q2] target 3.60 vs predicted 3.15 (diff 0.45)
+
+--- supplychain_val_0004 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 89.30%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.79%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 99.82%) -> FAIL
+  [Score Q1] target 1.80 vs predicted 2.67 (diff 0.87)
+  [Score Q2] target 1.40 vs predicted 4.52 (diff 3.12)
+
+--- network_val_0014 [networking] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 73.85%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 16.69%) -> PASS
+  [Score Q1] target 4.40 vs predicted 4.13 (diff 0.27)
+  [Score Q2] target 4.50 vs predicted 2.46 (diff 2.04)
+
+--- distsys_val_0004 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 77.33%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 4.29 (diff 0.49)
+  [Score Q2] target 3.90 vs predicted 3.85 (diff 0.05)
+
+--- cloudiam_val_0011 [security] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 92.93%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 54.41%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.99%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 0.02%) -> FAIL
+  [Score Q1] target 1.40 vs predicted 4.84 (diff 3.44)
+  [Score Q2] target 1.60 vs predicted 1.97 (diff 0.37)
+
+--- supplychain_val_0012 [supply_chain] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 98.97%) -> FAIL
+  [Choice Q2] target option 4 vs predicted option 1 (confidence 87.90%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 97.62%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 4.10 vs predicted 4.00 (diff 0.10)
+  [Score Q2] target 3.30 vs predicted 3.81 (diff 0.51)
+
+--- cloudiam_val_0020 [security] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 75.63%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.96%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 4.80 vs predicted 3.45 (diff 1.35)
+  [Score Q2] target 4.90 vs predicted 2.49 (diff 2.41)
+
+--- distsys_val_0012 [distributed_systems] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 99.92%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 2.56%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 84.71%) -> FAIL
+  [Score Q1] target 1.50 vs predicted 4.02 (diff 2.52)
+  [Score Q2] target 1.20 vs predicted 4.15 (diff 2.95)
+
+--- devops_val_0011 [devops] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 99.91%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 25.53%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 1.03 (diff 3.57)
+  [Score Q2] target 4.40 vs predicted 2.05 (diff 2.35)
+
+--- dataml_val_0001 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 99.85%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 87.73%) -> PASS
+  [Score Q1] target 4.00 vs predicted 2.05 (diff 1.95)
+  [Score Q2] target 4.10 vs predicted 1.87 (diff 2.23)
+
+--- distsys_val_0021 [distributed_systems] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 66.65%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.01%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.07%) -> PASS
+  [Score Q1] target 4.00 vs predicted 4.66 (diff 0.66)
+  [Score Q2] target 3.40 vs predicted 4.24 (diff 0.84)
+
+--- dataml_val_0015 [data_ml] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 49.10%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.84%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.52%) -> FAIL
+  [Score Q1] target 2.20 vs predicted 1.79 (diff 0.41)
+
+--- websec_val_0011 [security] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 87.39%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 1.20 vs predicted 4.20 (diff 3.00)
+
+--- fintech_val_0020 [fintech] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 99.73%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 82.84%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.02%) -> PASS
+  [Score Q1] target 1.60 vs predicted 3.10 (diff 1.50)
+  [Score Q2] target 4.30 vs predicted 3.50 (diff 0.80)
+
+--- supplychain_val_0011 [supply_chain] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 93.23%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.81%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 1.20 vs predicted 4.60 (diff 3.40)
+  [Score Q2] target 1.30 vs predicted 4.09 (diff 2.79)
+
+--- network_val_0004 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 99.83%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 85.59%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.01%) -> FAIL
+  [Score Q1] target 3.70 vs predicted 4.69 (diff 0.99)
+  [Score Q2] target 3.50 vs predicted 1.99 (diff 1.51)
+
+--- network_val_0022 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 82.74%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 13.03%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.20 vs predicted 1.77 (diff 2.43)
+  [Score Q2] target 3.90 vs predicted 4.12 (diff 0.22)
+
+--- cloudiam_val_0023 [security] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 89.59%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 5.91%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 99.84%) -> FAIL
+  [Score Q1] target 1.80 vs predicted 1.89 (diff 0.09)
+  [Score Q2] target 2.60 vs predicted 4.03 (diff 1.43)
+
+--- cloudiam_val_0021 [security] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 82.66%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 70.41%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 1.76%) -> FAIL
+  [Score Q1] target 1.40 vs predicted 3.99 (diff 2.59)
+  [Score Q2] target 1.70 vs predicted 1.13 (diff 0.57)
+
+--- supplychain_val_0022 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 95.82%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 51.34%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.02%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 3.45 (diff 2.15)
+  [Score Q2] target 1.50 vs predicted 3.62 (diff 2.12)
+
+--- fintech_val_0016 [fintech] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 96.47%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 98.36%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 50.88%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 100.00%) -> PASS
+  [Score Q1] target 1.20 vs predicted 3.79 (diff 2.59)
+  [Score Q2] target 2.30 vs predicted 3.87 (diff 1.57)
+
+--- network_val_0025 [networking] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 64.84%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 41.40%) -> PASS
+  [Score Q1] target 1.20 vs predicted 1.79 (diff 0.59)
+  [Score Q2] target 1.10 vs predicted 4.48 (diff 3.38)
+
+--- cloudiam_val_0001 [security] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Choice Q2] target option 3 vs predicted option 3 (confidence 71.77%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.74%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 39.30%) -> PASS
+  [Score Q1] target 4.70 vs predicted 4.03 (diff 0.67)
+  [Score Q2] target 4.80 vs predicted 3.15 (diff 1.65)
+
+--- llmsec_val_0015 [llm_security] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 98.19%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 50.88%) -> PASS
+  [Score Q1] target 1.20 vs predicted 4.00 (diff 2.80)
+  [Score Q2] target 1.10 vs predicted 3.32 (diff 2.22)
+
+--- distsys_val_0006 [distributed_systems] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 67.34%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 74.40%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 95.63%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 3.60%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 3.86 (diff 0.64)
+  [Score Q2] target 4.20 vs predicted 3.80 (diff 0.40)
+
+--- distsys_val_0018 [distributed_systems] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 79.62%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 60.37%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 2.10 vs predicted 3.24 (diff 1.14)
+  [Score Q2] target 1.70 vs predicted 1.45 (diff 0.25)
+
+--- websec_val_0009 [security] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 44.70%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.12%) -> PASS
+  [Score Q1] target 4.10 vs predicted 2.13 (diff 1.97)
+  [Score Q2] target 3.00 vs predicted 3.72 (diff 0.72)
+
+--- supplychain_val_0023 [supply_chain] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 97.83%) -> FAIL
+  [Choice Q2] target option 3 vs predicted option 4 (confidence 98.01%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 79.74%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 4.27 (diff 0.33)
+  [Score Q2] target 2.20 vs predicted 2.51 (diff 0.31)
+
+--- fintech_val_0023 [fintech] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 99.99%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 99.99%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 3.90 vs predicted 1.76 (diff 2.14)
+  [Score Q2] target 4.80 vs predicted 4.54 (diff 0.26)
+
+--- dataml_val_0006 [data_ml] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 32.60%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 7.14%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 50.88%) -> PASS
+  [Score Q1] target 3.70 vs predicted 3.19 (diff 0.51)
+  [Score Q2] target 3.50 vs predicted 4.11 (diff 0.61)
+
+--- cloudiam_val_0005 [security] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 99.95%) -> FAIL
+  [Choice Q2] target option 4 vs predicted option 4 (confidence 99.44%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 0.17%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 8.11%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 4.80 vs predicted 2.51 (diff 2.29)
+  [Score Q2] target 4.60 vs predicted 4.73 (diff 0.13)
+
+--- network_val_0007 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.96%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 96.99%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 31.59%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 1.51%) -> FAIL
+  [Score Q1] target 3.90 vs predicted 1.86 (diff 2.04)
+  [Score Q2] target 3.80 vs predicted 1.38 (diff 2.42)
+
+--- fintech_val_0002 [fintech] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 99.43%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 89.47%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 99.88%) -> FAIL
+  [Score Q1] target 2.60 vs predicted 1.11 (diff 1.49)
+  [Score Q2] target 2.20 vs predicted 1.22 (diff 0.98)
+
+--- llmsec_val_0001 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 48.02%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 65.81%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 12.40%) -> PASS
+  [Score Q1] target 4.50 vs predicted 4.11 (diff 0.39)
+  [Score Q2] target 4.30 vs predicted 4.00 (diff 0.30)
+
+--- network_val_0024 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 3.75 (diff 0.65)
+  [Score Q2] target 4.10 vs predicted 3.20 (diff 0.90)
+
+--- supplychain_val_0007 [supply_chain] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 67.64%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 2.49 (diff 1.19)
+  [Score Q2] target 1.20 vs predicted 2.09 (diff 0.89)
+
+--- dataml_val_0013 [data_ml] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 100.00%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 8.63%) -> FAIL
+  [Score Q1] target 1.40 vs predicted 4.18 (diff 2.78)
+
+--- cloudiam_val_0024 [security] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.36%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 3.60 vs predicted 3.12 (diff 0.48)
+  [Score Q2] target 1.90 vs predicted 3.14 (diff 1.24)
+
+--- distsys_val_0019 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 39.87%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.91%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 2.41%) -> PASS
+  [Score Q1] target 3.70 vs predicted 2.52 (diff 1.18)
+  [Score Q2] target 3.60 vs predicted 3.58 (diff 0.02)
+
+--- llmsec_val_0019 [llm_security] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 69.75%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.02%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 1.20 vs predicted 2.00 (diff 0.80)
+  [Score Q2] target 4.50 vs predicted 4.00 (diff 0.50)
+
+--- fintech_val_0018 [fintech] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 99.77%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 60.37%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.45%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 99.57%) -> PASS
+  [Score Q1] target 1.10 vs predicted 2.95 (diff 1.85)
+  [Score Q2] target 1.30 vs predicted 2.91 (diff 1.61)
+
+--- network_val_0019 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 77.23%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.45%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 3.21 (diff 1.91)
+  [Score Q2] target 1.20 vs predicted 1.21 (diff 0.01)
+
+--- cloudiam_val_0015 [security] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 98.54%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.96%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 96.72%) -> PASS
+  [Score Q1] target 1.20 vs predicted 3.66 (diff 2.46)
+  [Score Q2] target 1.90 vs predicted 3.80 (diff 1.90)
+
+--- network_val_0012 [networking] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 99.92%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 1.70%) -> PASS
+  [Score Q1] target 1.80 vs predicted 4.02 (diff 2.22)
+  [Score Q2] target 2.20 vs predicted 2.13 (diff 0.07)
+
+--- network_val_0001 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.61%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.16%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 3.95%) -> FAIL
+  [Score Q1] target 3.90 vs predicted 3.01 (diff 0.89)
+  [Score Q2] target 4.00 vs predicted 1.15 (diff 2.85)
+
+--- fintech_val_0007 [fintech] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 92.45%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 7.12%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 99.27%) -> PASS
+  [Score Q1] target 2.70 vs predicted 4.50 (diff 1.80)
+  [Score Q2] target 2.40 vs predicted 2.26 (diff 0.14)
+
+--- distsys_val_0002 [distributed_systems] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 99.53%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.12%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 2.00 vs predicted 4.84 (diff 2.84)
+  [Score Q2] target 1.50 vs predicted 3.49 (diff 1.99)
+
+--- llmsec_val_0017 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.17%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 3.60 vs predicted 2.46 (diff 1.14)
+  [Score Q2] target 1.10 vs predicted 2.39 (diff 1.29)
+
+--- network_val_0018 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 95.16%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 72.33%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 3.44%) -> PASS
+  [Score Q1] target 4.10 vs predicted 2.01 (diff 2.09)
+  [Score Q2] target 4.20 vs predicted 2.84 (diff 1.36)
+
+--- devops_val_0015 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 65.90%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 5.64%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.13%) -> PASS
+  [Score Q1] target 4.60 vs predicted 3.96 (diff 0.64)
+  [Score Q2] target 4.40 vs predicted 3.03 (diff 1.37)
+
+--- websec_val_0003 [security] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 94.32%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 11.64%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 81.88%) -> FAIL
+  [Score Q1] target 4.20 vs predicted 4.89 (diff 0.69)
+  [Score Q2] target 3.20 vs predicted 4.39 (diff 1.19)
+
+--- dataml_val_0020 [data_ml] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 91.54%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 63.38%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.98%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 0.04%) -> PASS
+  [Score Q1] target 4.40 vs predicted 1.62 (diff 2.78)
+
+--- distsys_val_0016 [distributed_systems] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 86.89%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 62.96%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 1.09%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.09%) -> PASS
+  [Score Q1] target 2.30 vs predicted 2.44 (diff 0.14)
+  [Score Q2] target 1.90 vs predicted 4.02 (diff 2.12)
+
+--- cloudiam_val_0010 [security] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 99.60%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 50.69%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.75%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 3.86 (diff 2.56)
+  [Score Q2] target 4.40 vs predicted 3.12 (diff 1.28)
+
+--- devops_val_0022 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 1.50 vs predicted 3.18 (diff 1.68)
+  [Score Q2] target 1.20 vs predicted 3.07 (diff 1.87)
+
+--- llmsec_val_0013 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 3.90 vs predicted 3.83 (diff 0.07)
+  [Score Q2] target 4.10 vs predicted 2.59 (diff 1.51)
+
+--- websec_val_0002 [security] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 96.61%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 2.40 vs predicted 2.27 (diff 0.13)
+  [Score Q2] target 1.20 vs predicted 4.09 (diff 2.89)
+
+--- dataml_val_0002 [data_ml] ---
+  [Choice Q1] target option 3 vs predicted option 2 (confidence 92.64%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 97.87%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 15.04%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.20 vs predicted 2.01 (diff 2.19)
+  [Score Q2] target 3.90 vs predicted 4.98 (diff 1.08)
+
+--- devops_val_0019 [devops] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.85%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 4.70 vs predicted 3.04 (diff 1.66)
+  [Score Q2] target 4.60 vs predicted 2.38 (diff 2.22)
+
+--- websec_val_0020 [security] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 99.82%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.99%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 0.20%) -> PASS
+  [Score Q1] target 4.70 vs predicted 3.78 (diff 0.92)
+  [Score Q2] target 4.20 vs predicted 3.25 (diff 0.95)
+
+--- websec_val_0008 [security] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 99.79%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.58%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 4.49 (diff 3.19)
+  [Score Q2] target 4.50 vs predicted 1.88 (diff 2.62)
+
+--- val_net_flap_001 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 98.56%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.99%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 2.29 (diff 2.11)
+  [Score Q2] target 4.70 vs predicted 4.01 (diff 0.69)
+
+--- dataml_val_0016 [data_ml] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 88.71%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 97.81%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 50.89%) -> FAIL
+  [Score Q1] target 4.70 vs predicted 4.09 (diff 0.61)
+  [Score Q2] target 4.60 vs predicted 3.72 (diff 0.88)
+
+--- devops_val_0010 [devops] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 96.42%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 14.07%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 50.50%) -> FAIL
+  [Score Q1] target 3.10 vs predicted 2.43 (diff 0.67)
+  [Score Q2] target 3.00 vs predicted 3.21 (diff 0.21)
+
+--- llmsec_val_0023 [llm_security] ---
+  [Choice Q1] target option 2 vs predicted option 1 (confidence 99.97%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 1.92%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 91.30%) -> PASS
+  [Score Q1] target 2.60 vs predicted 4.02 (diff 1.42)
+  [Score Q2] target 1.00 vs predicted 1.74 (diff 0.74)
+
+--- supplychain_val_0014 [supply_chain] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.98%) -> PASS
+  [Score Q1] target 1.20 vs predicted 4.84 (diff 3.64)
+  [Score Q2] target 1.30 vs predicted 3.03 (diff 1.73)
+
+--- network_val_0006 [networking] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 56.65%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 91.37%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.62%) -> FAIL
+  [Noul Q3] target true vs predicted false (prob 31.51%) -> FAIL
+  [Noul Q4] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 2.70 vs predicted 2.86 (diff 0.16)
+  [Score Q2] target 1.40 vs predicted 3.85 (diff 2.45)
+
+--- distsys_val_0025 [distributed_systems] ---
+  [Choice Q1] target option 1 vs predicted option 4 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.12%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.01%) -> FAIL
+  [Score Q1] target 4.20 vs predicted 2.18 (diff 2.02)
+  [Score Q2] target 4.20 vs predicted 4.10 (diff 0.10)
+
+--- websec_val_0013 [security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 36.71%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.42%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 99.18%) -> FAIL
+  [Score Q1] target 3.80 vs predicted 4.00 (diff 0.20)
+  [Score Q2] target 4.20 vs predicted 2.52 (diff 1.68)
+
+--- supplychain_val_0020 [supply_chain] ---
+  [Choice Q1] target option 2 vs predicted option 3 (confidence 100.00%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.01%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target true vs predicted false (prob 0.00%) -> FAIL
+  [Score Q1] target 2.00 vs predicted 1.99 (diff 0.01)
+  [Score Q2] target 1.80 vs predicted 4.47 (diff 2.67)
+
+--- websec_val_0006 [security] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted false (prob 28.10%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 43.58%) -> PASS
+  [Score Q1] target 4.50 vs predicted 1.45 (diff 3.05)
+  [Score Q2] target 4.70 vs predicted 3.91 (diff 0.79)
+
+--- network_val_0017 [networking] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 97.12%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.99%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 54.59%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.20 vs predicted 4.05 (diff 0.15)
+  [Score Q2] target 4.40 vs predicted 4.00 (diff 0.40)
+
+--- dataml_val_0004 [data_ml] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 90.84%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 95.20%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 18.70%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 56.30%) -> FAIL
+  [Score Q1] target 4.50 vs predicted 4.23 (diff 0.27)
+  [Score Q2] target 4.60 vs predicted 1.58 (diff 3.02)
+
+--- fintech_val_0003 [fintech] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 99.83%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 81.89%) -> FAIL
+  [Noul Q4] target true vs predicted true (prob 99.65%) -> PASS
+  [Score Q1] target 4.60 vs predicted 1.35 (diff 3.25)
+  [Score Q2] target 4.20 vs predicted 4.35 (diff 0.15)
+
+--- websec_val_0010 [security] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 98.58%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 97.01%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.00%) -> FAIL
+  [Noul Q3] target false vs predicted false (prob 0.00%) -> PASS
+  [Score Q1] target 4.30 vs predicted 3.06 (diff 1.24)
+  [Score Q2] target 4.30 vs predicted 3.67 (diff 0.63)
+
+--- devops_val_0001 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 2 (confidence 86.82%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.97%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 0.68%) -> PASS
+  [Score Q1] target 1.20 vs predicted 1.71 (diff 0.51)
+  [Score Q2] target 3.40 vs predicted 4.52 (diff 1.12)
+
+--- network_val_0021 [networking] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 82.41%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 92.40%) -> PASS
+  [Score Q1] target 1.30 vs predicted 3.76 (diff 2.46)
+  [Score Q2] target 1.40 vs predicted 3.35 (diff 1.95)
+
+--- devops_val_0025 [devops] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 99.53%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.05%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 2.49 (diff 1.91)
+  [Score Q2] target 4.30 vs predicted 4.75 (diff 0.45)
+
+--- websec_val_0004 [security] ---
+  [Choice Q1] target option 1 vs predicted option 1 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 99.94%) -> PASS
+  [Noul Q2] target false vs predicted false (prob 3.19%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 99.58%) -> PASS
+  [Score Q1] target 1.60 vs predicted 3.72 (diff 2.12)
+  [Score Q2] target 1.10 vs predicted 3.63 (diff 2.53)
+
+--- devops_val_0012 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 3 (confidence 83.80%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.91%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 50.88%) -> FAIL
+  [Score Q1] target 4.70 vs predicted 3.79 (diff 0.91)
+  [Score Q2] target 4.50 vs predicted 3.99 (diff 0.51)
+
+--- cloudiam_val_0006 [security] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 82.89%) -> FAIL
+  [Noul Q1] target false vs predicted false (prob 0.02%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 99.52%) -> PASS
+  [Score Q1] target 1.10 vs predicted 3.27 (diff 2.17)
+  [Score Q2] target 4.30 vs predicted 3.22 (diff 1.08)
+
+--- fintech_val_0005 [fintech] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 99.99%) -> PASS
+  [Noul Q1] target false vs predicted true (prob 100.00%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 99.02%) -> PASS
+  [Noul Q3] target false vs predicted false (prob 11.14%) -> PASS
+  [Score Q1] target 1.20 vs predicted 4.69 (diff 3.49)
+  [Score Q2] target 1.50 vs predicted 1.39 (diff 0.11)
+
+--- fintech_val_0019 [fintech] ---
+  [Choice Q1] target option 3 vs predicted option 4 (confidence 96.60%) -> FAIL
+  [Noul Q1] target false vs predicted true (prob 83.62%) -> FAIL
+  [Noul Q2] target false vs predicted false (prob 0.00%) -> PASS
+  [Noul Q3] target true vs predicted true (prob 99.99%) -> PASS
+  [Score Q1] target 3.90 vs predicted 4.00 (diff 0.10)
+  [Score Q2] target 4.60 vs predicted 2.74 (diff 1.86)
+
+--- distsys_val_0008 [distributed_systems] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 99.99%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 3.52%) -> FAIL
+  [Noul Q2] target true vs predicted false (prob 23.49%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 93.10%) -> FAIL
+  [Score Q1] target 4.40 vs predicted 4.03 (diff 0.37)
+  [Score Q2] target 4.30 vs predicted 2.72 (diff 1.58)
+
+--- websec_val_0001 [security] ---
+  [Choice Q1] target option 3 vs predicted option 1 (confidence 89.58%) -> FAIL
+  [Noul Q1] target true vs predicted true (prob 50.76%) -> PASS
+  [Noul Q2] target true vs predicted false (prob 0.01%) -> FAIL
+  [Noul Q3] target false vs predicted true (prob 53.46%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 1.79 (diff 2.81)
+  [Score Q2] target 4.00 vs predicted 1.99 (diff 2.01)
+
+--- supplychain_val_0002 [supply_chain] ---
+  [Choice Q1] target option 1 vs predicted option 3 (confidence 87.45%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 45.84%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 97.07%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 2.65 (diff 1.35)
+  [Score Q2] target 1.20 vs predicted 3.94 (diff 2.74)
+
+--- distsys_val_0001 [distributed_systems] ---
+  [Choice Q1] target option 2 vs predicted option 2 (confidence 86.94%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q2] target true vs predicted true (prob 82.49%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 66.77%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 4.20 (diff 0.40)
+  [Score Q2] target 4.30 vs predicted 2.46 (diff 1.84)
+
+--- llmsec_val_0011 [llm_security] ---
+  [Choice Q1] target option 2 vs predicted option 4 (confidence 100.00%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 0.14%) -> FAIL
+  [Noul Q2] target true vs predicted true (prob 100.00%) -> PASS
+  [Noul Q3] target false vs predicted true (prob 100.00%) -> FAIL
+  [Score Q1] target 4.60 vs predicted 3.16 (diff 1.44)
+  [Score Q2] target 4.50 vs predicted 2.02 (diff 2.48)
+
+--- llmsec_val_0024 [llm_security] ---
+  [Choice Q1] target option 4 vs predicted option 1 (confidence 93.52%) -> FAIL
+  [Noul Q1] target true vs predicted false (prob 1.67%) -> FAIL
+  [Noul Q2] target false vs predicted true (prob 83.55%) -> FAIL
+  [Noul Q3] target true vs predicted true (prob 81.31%) -> PASS
+  [Score Q1] target 4.80 vs predicted 4.33 (diff 0.47)
+  [Score Q2] target 4.90 vs predicted 4.32 (diff 0.58)
+
+--- devops_val_0024 [devops] ---
+  [Choice Q1] target option 4 vs predicted option 4 (confidence 100.00%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 78.73%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.32%) -> FAIL
+  [Score Q1] target 1.30 vs predicted 2.59 (diff 1.29)
+  [Score Q2] target 1.40 vs predicted 4.01 (diff 2.61)
+
+--- network_val_0010 [networking] ---
+  [Choice Q1] target option 3 vs predicted option 3 (confidence 99.98%) -> PASS
+  [Noul Q1] target true vs predicted true (prob 65.65%) -> PASS
+  [Noul Q2] target false vs predicted true (prob 99.55%) -> FAIL
+  [Score Q1] target 2.20 vs predicted 2.00 (diff 0.20)
+  [Score Q2] target 1.40 vs predicted 3.08 (diff 1.68)
+
+=== Summary ===
+ Choice accuracy: 22.7% (55/242)
+ Noul accuracy:   51.0% (292/573)
+ Score RMSE:      1.711 across 436 rubric queries
