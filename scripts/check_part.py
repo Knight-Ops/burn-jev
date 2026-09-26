@@ -30,8 +30,8 @@ def check_record(r):
         t = q.get("target")
         if not isinstance(q.get("prompt"), str) or not q["prompt"].strip():
             errs.append(f"choice {i} empty prompt")
-        if not (2 <= len(c) <= 4) or not all(isinstance(x, str) and x.strip() for x in c):
-            errs.append(f"choice {i} needs 2-4 non-empty candidates")
+        if not (2 <= len(c) <= 50) or not all(isinstance(x, str) and x.strip() for x in c):
+            errs.append(f"choice {i} needs 2-50 non-empty candidates")
         if len(set(c)) != len(c):
             errs.append(f"choice {i} duplicate candidates")
         if not isinstance(t, int) or isinstance(t, bool) or not (0 <= t < len(c)):
