@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Ablation: does adding imported typed-decisions data (data/ext/) help the Tier 1 model?
-# Every config trains on the in-domain set plus zero or more auxiliary files, validates on the
-# unchanged in-domain validation set, and is repeated over several seeds (val metrics are
-# seed-noisy). Summarize with scripts/summarize_ext_ablation.py.
+# Every config trains on the in-domain set plus zero or more auxiliary files and validates on the
+# same merged set for all configs: in-domain val + the external held-out sets (EXT_VAL, passed as
+# extra --val). Repeated over several seeds (val metrics are seed-noisy). Summarize with
+# scripts/summarize_ext_ablation.py, which splits metrics per source (in-domain vs each ext set).
 #
 #   scripts/run_ext_ablation.sh [config ...]     # default: all configs
 #   ENCODER=models/modernbert-large SEEDS="42 1 2 3" scripts/run_ext_ablation.sh baseline
@@ -15,6 +16,7 @@ BACKEND=${BACKEND:-wgpu}
 LOGS=${LOGS:-data/.runs/ext-ablation}
 TRAIN=data/reflex_training_data.jsonl
 VAL=data/reflex_validation_data.jsonl
+EXT_VAL=${EXT_VAL:-"data/ext/procedural_val.jsonl data/ext/llama_security_val.jsonl data/ext/nemotron_ipi_val.jsonl"}
 
 declare -A EXTRA=(
   [baseline]=""
@@ -33,6 +35,7 @@ for config in "${CONFIGS[@]}"; do
   [[ -v "EXTRA[$config]" ]] || { echo "unknown config: $config" >&2; exit 1; }
   extra_args=()
   for f in ${EXTRA[$config]}; do extra_args+=(--train "$f"); done
+  for f in $EXT_VAL; do extra_args+=(--val "$f"); done
   for seed in $SEEDS; do
     log="$LOGS/$config-seed$seed.log"
     if grep -q "^ Score RMSE" "$log" 2>/dev/null; then
@@ -41,7 +44,7 @@ for config in "${CONFIGS[@]}"; do
     fi
     echo "[run] $config seed $seed -> $log"
     ./target/release/reflex-train --backend "$BACKEND" --encoder "$ENCODER" \
-      --train "$TRAIN" "${extra_args[@]}" --val "$VAL" \
+      --train "$TRAIN" --val "$VAL" "${extra_args[@]}" \
       --out "models/ext-ablation/$config-seed$seed.safetensors" --seed "$seed" \
       > "$log" 2>&1 </dev/null
   done

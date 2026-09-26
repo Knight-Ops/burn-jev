@@ -2,7 +2,7 @@
 //! and writes a decision artifact.
 //!
 //! ```text
-//! reflex-train [--backend cpu|wgpu|cuda] --encoder <dir> --train <jsonl> [--train <jsonl> ...] --val <jsonl> --out <st> [options]
+//! reflex-train [--backend cpu|wgpu|cuda] --encoder <dir> --train <jsonl> [--train <jsonl> ...] --val <jsonl> [--val <jsonl> ...] --out <st> [options]
 //! reflex-train eval [--backend cpu|wgpu|cuda] --encoder <dir> --artifact <st> --data <jsonl> [--baseline-from <jsonl>]
 //! ```
 //!
@@ -68,9 +68,11 @@ struct TrainArgs {
     /// file is feature-cached separately and the first one is the reference for baselines.
     #[arg(long, required = true)]
     train: Vec<PathBuf>,
-    /// Validation scenarios (JSONL); drives early stopping and best-epoch selection.
+    /// Validation scenarios (JSONL). Repeat to add sets; all are merged into one validation set
+    /// that drives early stopping, best-epoch selection and the final report; each file is
+    /// feature-cached separately.
     #[arg(long, required = true)]
-    val: Option<PathBuf>,
+    val: Vec<PathBuf>,
     /// Output path for the decision artifact.
     #[arg(long, required = true)]
     out: Option<PathBuf>,
@@ -242,11 +244,11 @@ fn features_for<B: Backend>(
 fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
     // `required = true` guarantees these are present when no subcommand is given.
     let train_paths = args.train.clone();
-    let val_path = args.val.clone().unwrap();
+    let val_paths = args.val.clone();
     let out_path = args.out.clone().unwrap();
 
     let train_sets = train_paths.iter().map(|p| load_dataset(p)).collect::<AppResult<Vec<_>>>()?;
-    let val_ds = load_dataset(&val_path)?;
+    let val_sets = val_paths.iter().map(|p| load_dataset(p)).collect::<AppResult<Vec<_>>>()?;
     let enc = load_encoder::<B>(&args.enc, &device)?;
     let encoding = EncodingConfig::for_encoder(&enc.loaded.config).with_max_seq_len(args.max_seq_len);
 
@@ -260,7 +262,16 @@ fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
     for (ds, path) in train_sets.iter().zip(&train_paths) {
         train_features.extend(features_for(&enc, &encoding, ds, path, &cache, &device)?);
     }
-    let val_features = features_for(&enc, &encoding, &val_ds, &val_path, &cache, &device)?;
+    let mut val_features = Vec::new();
+    for (ds, path) in val_sets.iter().zip(&val_paths) {
+        val_features.extend(features_for(&enc, &encoding, ds, path, &cache, &device)?);
+    }
+    let val_ds = JevDataset {
+        records: val_sets.into_iter().flat_map(|ds| ds.records).collect(),
+    };
+    if val_paths.len() > 1 {
+        eprintln!("[dataset] {} validation scenarios merged from {} files", val_ds.len(), val_paths.len());
+    }
 
     let reader = ItemReaderConfig::new(enc.loaded.config.hidden_size)
         .with_d_reader(args.reader_dim)

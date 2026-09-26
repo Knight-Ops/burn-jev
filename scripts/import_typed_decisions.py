@@ -25,15 +25,21 @@ dropped; rows left with no questions, or whose encoding would truncate the conte
 --max-seq-len, are dropped. `is_benign` is only set where the source says so (the llama
 `true_positive` noul, subject to the same margin); otherwise it is omitted (= unknown).
 
-Outputs are auxiliary train files for `reflex-train --train <in-domain> --train <ext>`; never
-mix them into the validation set. Run with LD_LIBRARY_PATH unset (libtorch conflicts):
+Train files are auxiliary sets for `reflex-train --train <in-domain> --train <ext>`. Held-out files
+(`*_val.jsonl`, from the sources' own test splits; a stable per-row hash holdout for nemotron,
+which has none) are for `reflex-train eval --data`, never for `--val` (that stays in-domain, as
+it drives epoch selection). Run with LD_LIBRARY_PATH unset (libtorch conflicts):
 
-  env -u LD_LIBRARY_PATH uv run scripts/import_typed_decisions.py procedural --out data/ext/procedural.jsonl
-  env -u LD_LIBRARY_PATH uv run scripts/import_typed_decisions.py llama --configs security_incidents \\
-      --out data/ext/llama_security.jsonl
-  env -u LD_LIBRARY_PATH uv run scripts/import_typed_decisions.py nemotron --out data/ext/nemotron_ipi.jsonl
+  S="env -u LD_LIBRARY_PATH uv run scripts/import_typed_decisions.py"
+  $S procedural --out data/ext/procedural.jsonl
+  $S procedural --split test --per-subset 100 --out data/ext/procedural_val.jsonl
+  $S llama --configs security_incidents --out data/ext/llama_security.jsonl
+  $S llama --configs security_incidents --splits test --out data/ext/llama_security_val.jsonl
+  $S nemotron --out data/ext/nemotron_ipi.jsonl
+  $S nemotron --part holdout --out data/ext/nemotron_ipi_val.jsonl
 """
 import argparse
+import hashlib
 import json
 import os
 import random
@@ -213,14 +219,14 @@ def import_procedural(args, tok):
     out = []
     for subset in args.subsets:
         stats = Counter()
-        ds = load_dataset(PROCEDURAL, subset, split="train").shuffle(seed=args.seed)
+        ds = load_dataset(PROCEDURAL, subset, split=args.split).shuffle(seed=args.seed)
         kept = []
         for row in ds:
             if len(kept) >= args.per_subset:
                 break
             stats["rows_seen"] += 1
             rec = build_record(
-                f"ext_proc_{subset}_{len(kept):05d}",
+                f"ext_proc_{args.split}_{subset}_{len(kept):05d}",
                 f"ext_procedural_{subset}",
                 row["state"],
                 json.loads(row["questions"]),
@@ -242,7 +248,7 @@ def import_llama(args, tok):
     for config in args.configs:
         stats = Counter()
         kept = []
-        for split in ("train", "test"):
+        for split in args.splits:
             for row in load_dataset(LLAMA, config, split=split):
                 stats["rows_seen"] += 1
                 gold = json.loads(row["gold"])
@@ -251,7 +257,7 @@ def import_llama(args, tok):
                 if tp is not None and abs(float(tp["noul"]) - 0.5) >= args.noul_margin:
                     is_benign = float(tp["noul"]) < 0.5
                 rec = build_record(
-                    f"ext_llama_{config}_{len(kept):05d}",
+                    f"ext_llama_{config}_{split}_{len(kept):05d}",
                     f"ext_llama_{config}",
                     row["state"],
                     json.loads(row["questions"]),
@@ -295,6 +301,12 @@ def nemotron_context(row, env):
     )
 
 
+def nemotron_holdout(row_id, frac):
+    """Stable held-out membership per source row (keeps each attack/clean pair together)."""
+    h = int.from_bytes(hashlib.sha256(f"nemotron:{row_id}".encode()).digest()[:8], "big")
+    return h / 2**64 < frac
+
+
 def import_nemotron(args, tok):
     """Attack record + clean counterfactual per row. Labels (all exact, from metadata):
     - noul "retrieved data contains instructions not from the user": attack 1, clean 0
@@ -310,6 +322,8 @@ def import_nemotron(args, tok):
     for row in ds:
         if args.limit and len(kept) >= 2 * args.limit:
             break
+        if nemotron_holdout(row["id"], args.holdout_frac) != (args.part == "holdout"):
+            continue
         stats["rows_seen"] += 1
         inj = row["injection"]
         env = row["environment"]
@@ -392,11 +406,15 @@ def main():
     sub = ap.add_subparsers(dest="source", required=True)
     p = sub.add_parser("procedural")
     p.add_argument("--subsets", nargs="+", default=PROCEDURAL_SUBSETS)
-    p.add_argument("--per-subset", type=int, default=500, help="rows kept per subset (train split)")
+    p.add_argument("--per-subset", type=int, default=500, help="rows kept per subset")
+    p.add_argument("--split", default="train", choices=["train", "validation", "test"])
     l = sub.add_parser("llama")
     l.add_argument("--configs", nargs="+", default=["security_incidents"])
+    l.add_argument("--splits", nargs="+", default=["train"], choices=["train", "test"])
     n = sub.add_parser("nemotron")
     n.add_argument("--limit", type=int, default=0, help="max source rows (each yields 2 records); 0 = all")
+    n.add_argument("--part", default="train", choices=["train", "holdout"], help="no test split upstream")
+    n.add_argument("--holdout-frac", type=float, default=0.1)
     for s in (p, l, n):
         s.add_argument("--out", required=True)
         s.add_argument("--tokenizer", default=os.path.join(ROOT, "models/modernbert-base/tokenizer.json"))
