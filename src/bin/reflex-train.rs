@@ -414,4 +414,60 @@ fn print_report(report: &EvalReport, baselines: &Baselines, baseline_source: &st
         pct(report.choice_ece()),
         pct(report.noul_ece())
     );
+
+    // A merged evaluation set (several --val files) mixes sources; split it so the core set
+    // (our generated data) is visible on its own next to each imported external set.
+    let mut by_source: Vec<(String, EvalReport)> = Vec::new();
+    for s in &report.scenarios {
+        let src = source_of(s.domain.as_deref());
+        match by_source.iter_mut().find(|(k, _)| *k == src) {
+            Some((_, r)) => r.scenarios.push(s.clone()),
+            None => by_source.push((src, EvalReport { scenarios: vec![s.clone()] })),
+        }
+    }
+    if by_source.len() > 1 {
+        by_source.sort_by(|a, b| (a.0 != "core", &a.0).cmp(&(b.0 != "core", &b.0)));
+        println!("\n=== Per source ===");
+        for (src, r) in &by_source {
+            let (cc, ct) = r.choice_counts();
+            let (nc, nt) = r.noul_counts();
+            println!(
+                " {src:<30} {:>5} scenarios | choice {:>6} ({cc}/{ct}) | noul {:>6} ({nc}/{nt}) | score RMSE {:>5} ({}) | ECE choice {}, noul {}",
+                r.scenarios.len(),
+                pct(r.choice_accuracy()),
+                pct(r.noul_accuracy()),
+                num(r.score_rmse()),
+                r.score_count(),
+                pct(r.choice_ece()),
+                pct(r.noul_ece())
+            );
+        }
+    }
+}
+
+/// `core` (our generated set), or the imported external set a domain belongs to
+/// (`ext_procedural`, `ext_nemotron_ipi`, `ext_llama_<config>`); see `scripts/import_typed_decisions.py`.
+fn source_of(domain: Option<&str>) -> String {
+    match domain {
+        Some(d) if d.starts_with("ext_") => ["ext_procedural", "ext_nemotron_ipi"]
+            .into_iter()
+            .find(|p| d.starts_with(p))
+            .unwrap_or(d)
+            .to_string(),
+        _ => "core".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::source_of;
+
+    #[test]
+    fn test_source_of() {
+        assert_eq!(source_of(None), "core");
+        assert_eq!(source_of(Some("security")), "core");
+        assert_eq!(source_of(Some("ext_procedural_table_lookup")), "ext_procedural");
+        assert_eq!(source_of(Some("ext_nemotron_ipi_healthcare")), "ext_nemotron_ipi");
+        assert_eq!(source_of(Some("ext_llama_security_incidents")), "ext_llama_security_incidents");
+    }
 }
