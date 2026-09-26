@@ -18,6 +18,12 @@ fn test_jsonl_parse_and_validate() {
     assert_eq!(dataset.records[0].choice_questions[0].target, 0);
     assert_eq!(dataset.records[0].noul_queries[0].target, 1.0);
     assert_eq!(dataset.records[0].score_rubrics[0].target, 4.5);
+    assert_eq!(dataset.records[0].is_benign, Some(true));
+    assert_eq!(dataset.records[1].is_benign, Some(false));
+
+    // A missing label means "unknown" (external data), not benign.
+    let unlabeled = JevDataset::from_jsonl_str(r#"{"id":"ext_1","context":"telemetry"}"#).unwrap();
+    assert_eq!(unlabeled.records[0].is_benign, None);
 }
 
 #[test]
@@ -51,7 +57,7 @@ fn test_dataset_split() {
             id: format!("scen_{i}"),
             domain: Some("test".into()),
             context: format!("Context {i}"),
-            is_benign: true,
+            is_benign: Some(true),
             choice_questions: vec![ChoiceQuestionRecord {
                 prompt: "P".into(),
                 candidates: vec!["A".into(), "B".into()],
@@ -88,7 +94,7 @@ fn test_dataset_encode_with_tokenizer() {
         id: "test_encode".into(),
         domain: Some("sysadmin".into()),
         context: "Cluster telemetry shows CPU load average at 12.4 on 8-core host.".into(),
-        is_benign: true,
+        is_benign: Some(true),
         choice_questions: vec![ChoiceQuestionRecord {
             prompt: "Select mitigation:".into(),
             candidates: vec![

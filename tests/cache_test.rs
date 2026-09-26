@@ -4,7 +4,7 @@ fn scenario(id: &str, ctx_len: usize, kinds: Vec<ItemKind>, d: usize) -> CachedS
     let n = kinds.len();
     CachedScenario {
         id: id.into(),
-        is_benign: id.ends_with('b'),
+        is_benign: Some(id.ends_with('b')),
         targets: MultiQuestionTargets::new().with_choice_target(1).with_noul_target(0.25).with_score_target(3.5),
         features: ScenarioFeatures {
             d_model: d,

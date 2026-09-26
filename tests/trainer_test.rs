@@ -50,7 +50,7 @@ fn scenario(rng: &mut Lcg, i: usize) -> CachedScenario {
 
     CachedScenario {
         id: format!("syn_{i}"),
-        is_benign: i % 3 != 0,
+        is_benign: Some(i % 3 != 0),
         targets: MultiQuestionTargets::new()
             .with_choice_target(target)
             .with_noul_target(truth as u8 as f32)

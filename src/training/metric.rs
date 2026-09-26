@@ -35,12 +35,14 @@ impl MetricLossConfig {
 /// where:
 /// - $\mathbf{z}_i$ is the L2-normalized embedding extracted by the k-NN metric head
 /// - $\mathcal{P}(i) = \{ p \ne i \mid \text{is\_benign}[p] = \text{true} \}$
-/// - $\mathcal{A}(i) = \{ a \ne i \}$ (includes all peers: benign, cross-tenant, and adversarial)
+/// - $\mathcal{A}(i) = \{ a \ne i \mid \text{is\_benign}[a] \ne \text{None} \}$ (all labeled peers:
+///   benign, cross-tenant, and adversarial)
 ///
+/// Scenarios with unknown benignness (`None`) are neither anchors, positives nor negatives.
 /// If a batch contains no valid benign pairs, returns a zero-valued scalar tensor.
 pub fn benign_adversarial_metric_loss<B: Backend>(
     embeddings: Tensor<B, 2>,
-    is_benign: &[bool],
+    is_benign: &[Option<bool>],
     temperature: f32,
     device: &B::Device,
 ) -> Tensor<B, 1> {
@@ -58,14 +60,15 @@ pub fn benign_adversarial_metric_loss<B: Backend>(
     let mut valid_anchors = Vec::with_capacity(batch_size);
 
     for i in 0..batch_size {
-        let is_i_benign = is_benign.get(i).copied().unwrap_or(true);
+        let is_i_benign = is_benign.get(i).copied().flatten() == Some(true);
         let mut row_pos_count = 0;
 
         for j in 0..batch_size {
-            let is_j_benign = is_benign.get(j).copied().unwrap_or(true);
+            let label_j = is_benign.get(j).copied().flatten();
+            let is_j_benign = label_j == Some(true);
             let not_self = i != j;
 
-            all_mask_data.push(not_self);
+            all_mask_data.push(not_self && label_j.is_some());
 
             let is_pos = not_self && is_i_benign && is_j_benign;
             pos_mask_data.push(is_pos);

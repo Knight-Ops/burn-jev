@@ -12,7 +12,7 @@ fn test_benign_adversarial_metric_loss_dynamics() {
     let device = FlexDevice;
 
     // 4 samples: 2 benign, 2 adversarial
-    let is_benign = vec![true, true, false, false];
+    let is_benign = vec![Some(true), Some(true), Some(false), Some(false)];
 
     // Case 1: Benign samples are close (cosine sim ~ 1.0), adversarial are orthogonal/distant
     let good_data: [f32; 8] = [
@@ -51,7 +51,7 @@ fn test_metric_loss_handles_zero_benign_pairs_gracefully() {
     let device = FlexDevice;
 
     // Batch with only 1 benign item (no positive peers possible)
-    let is_benign = vec![true, false, false];
+    let is_benign = vec![Some(true), Some(false), Some(false)];
     let emb_data: [f32; 6] = [
         1.0, 0.0,
         0.0, 1.0,
@@ -63,6 +63,25 @@ fn test_metric_loss_handles_zero_benign_pairs_gracefully() {
     let loss = benign_adversarial_metric_loss(embeddings, &is_benign, 0.07, &device);
     let val = loss.into_data().as_slice::<f32>().unwrap()[0];
     assert_eq!(val, 0.0, "Zero valid positive pairs should yield 0.0 loss without NaN or panic");
+}
+
+#[test]
+fn test_metric_loss_ignores_unlabeled_scenarios() {
+    let device = FlexDevice;
+    let loss = |is_benign: &[Option<bool>], data: &[f32]| {
+        let n = is_benign.len();
+        let emb = Tensor::<TestBackend, 1>::from_data(data, &device).reshape([n, 2]);
+        benign_adversarial_metric_loss(emb, is_benign, 0.1, &device).into_data().as_slice::<f32>().unwrap()[0]
+    };
+
+    let labeled = [1.0, 0.0, 0.99, 0.14, 0.0, 1.0];
+    let base = loss(&[Some(true), Some(true), Some(false)], &labeled);
+    // An unlabeled scenario sitting right on top of the benign anchors must not act as a negative.
+    let with_unknown = loss(&[Some(true), Some(true), Some(false), None], &[labeled.as_slice(), &[1.0, 0.0]].concat());
+    assert!((base - with_unknown).abs() < 1e-5, "unlabeled scenario changed the loss: {base} vs {with_unknown}");
+
+    // Only unlabeled peers: no valid anchors.
+    assert_eq!(loss(&[Some(true), None, None], &[1.0, 0.0, 0.0, 1.0, -1.0, 0.0]), 0.0);
 }
 
 #[test]

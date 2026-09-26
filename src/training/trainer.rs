@@ -328,7 +328,7 @@ impl EarlyStoppingStrategy for LagTolerantEarlyStopping {
 #[derive(Clone)]
 pub struct DecisionBatch<B: Backend> {
     pub features: Arc<FeatureBatch<B>>,
-    pub is_benign: Vec<bool>,
+    pub is_benign: Vec<Option<bool>>,
     pub choice_targets: Vec<i64>,
     pub noul_targets: Vec<f32>,
     pub score_targets: Vec<f32>,

@@ -24,7 +24,7 @@ const CACHE_VERSION: u32 = 2;
 #[derive(Clone, Debug, PartialEq)]
 pub struct CachedScenario {
     pub id: String,
-    pub is_benign: bool,
+    pub is_benign: Option<bool>,
     pub targets: MultiQuestionTargets,
     pub features: ScenarioFeatures,
 }
@@ -33,7 +33,7 @@ pub struct CachedScenario {
 pub struct ScenarioDiskMeta {
     pub id: String,
     pub targets: MultiQuestionTargets,
-    pub is_benign: bool,
+    pub is_benign: Option<bool>,
     pub ctx_len: usize,
     pub kinds: Vec<ItemKind>,
 }

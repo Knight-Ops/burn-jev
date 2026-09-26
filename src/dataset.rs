@@ -10,7 +10,8 @@
 //! - Multiple choice questions with candidate actions and ground-truth index
 //! - Multiple Noul boolean assertions with ground-truth float target (0.0 or 1.0)
 //! - Multiple continuous/ordinal score rubrics with ground-truth float target (1.0 to 5.0)
-//! - Binary benign/adversarial indicator for contrastive metric learning
+//! - Optional benign/adversarial indicator for contrastive metric learning (absent = unknown,
+//!   e.g. imported external data; such scenarios are left out of the metric loss)
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
@@ -55,18 +56,15 @@ pub struct JevScenarioRecord {
     #[serde(default)]
     pub domain: Option<String>,
     pub context: String,
-    #[serde(default = "default_benign")]
-    pub is_benign: bool,
+    /// `None` = unknown (external data); excluded from the contrastive metric loss.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_benign: Option<bool>,
     #[serde(default)]
     pub choice_questions: Vec<ChoiceQuestionRecord>,
     #[serde(default)]
     pub noul_queries: Vec<NoulQueryRecord>,
     #[serde(default)]
     pub score_rubrics: Vec<ScoreRubricRecord>,
-}
-
-fn default_benign() -> bool {
-    true
 }
 
 // =====================================================================
@@ -126,7 +124,7 @@ pub struct TokenizedScenario {
     pub id: String,
     pub encoded: EncodedScenario,
     pub targets: MultiQuestionTargets,
-    pub is_benign: bool,
+    pub is_benign: Option<bool>,
 }
 
 impl JevScenarioRecord {

@@ -2,7 +2,7 @@
 //! and writes a decision artifact.
 //!
 //! ```text
-//! reflex-train [--backend cpu|wgpu|cuda] --encoder <dir> --train <jsonl> --val <jsonl> --out <st> [options]
+//! reflex-train [--backend cpu|wgpu|cuda] --encoder <dir> --train <jsonl> [--train <jsonl> ...] --val <jsonl> --out <st> [options]
 //! reflex-train eval [--backend cpu|wgpu|cuda] --encoder <dir> --artifact <st> --data <jsonl> [--baseline-from <jsonl>]
 //! ```
 //!
@@ -64,9 +64,10 @@ struct EncoderArgs {
 struct TrainArgs {
     #[command(flatten)]
     enc: EncoderArgs,
-    /// Training scenarios (JSONL).
+    /// Training scenarios (JSONL). Repeat to add auxiliary sets (e.g. `data/ext/*.jsonl`); each
+    /// file is feature-cached separately and the first one is the reference for baselines.
     #[arg(long, required = true)]
-    train: Option<PathBuf>,
+    train: Vec<PathBuf>,
     /// Validation scenarios (JSONL); drives early stopping and best-epoch selection.
     #[arg(long, required = true)]
     val: Option<PathBuf>,
@@ -240,11 +241,11 @@ fn features_for<B: Backend>(
 
 fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
     // `required = true` guarantees these are present when no subcommand is given.
-    let train_path = args.train.clone().unwrap();
+    let train_paths = args.train.clone();
     let val_path = args.val.clone().unwrap();
     let out_path = args.out.clone().unwrap();
 
-    let train_ds = load_dataset(&train_path)?;
+    let train_sets = train_paths.iter().map(|p| load_dataset(p)).collect::<AppResult<Vec<_>>>()?;
     let val_ds = load_dataset(&val_path)?;
     let enc = load_encoder::<B>(&args.enc, &device)?;
     let encoding = EncodingConfig::for_encoder(&enc.loaded.config).with_max_seq_len(args.max_seq_len);
@@ -255,7 +256,10 @@ fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
         model_id: &cache_key,
         enabled: !args.no_cache,
     };
-    let train_features = features_for(&enc, &encoding, &train_ds, &train_path, &cache, &device)?;
+    let mut train_features = Vec::new();
+    for (ds, path) in train_sets.iter().zip(&train_paths) {
+        train_features.extend(features_for(&enc, &encoding, ds, path, &cache, &device)?);
+    }
     let val_features = features_for(&enc, &encoding, &val_ds, &val_path, &cache, &device)?;
 
     let reader = ItemReaderConfig::new(enc.loaded.config.hidden_size)
@@ -308,10 +312,10 @@ fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
     );
 
     // End-to-end check through the inference path (encoder → features → decision model).
-    let baselines = Baselines::compute(&train_ds, &val_ds);
+    let baselines = Baselines::compute(&train_sets[0], &val_ds);
     let engine = ReflexEngine::new(enc.loaded.model, output.model, encoding, enc.tokenizer);
     let report = evaluate_dataset(&engine, &val_ds, &device)?;
-    print_report(&report, &baselines, "train");
+    print_report(&report, &baselines, "primary train set");
     Ok(())
 }
 
