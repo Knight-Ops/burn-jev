@@ -1,109 +1,59 @@
-use burn::tensor::{Tensor, TensorData};
-use burn_flex::{Flex, FlexDevice};
-use burn_mamba::{CachedScenario, FeatureCache, MultiQuestionTargets};
-use std::fs;
-use std::path::PathBuf;
+use burn_mamba::{CachedScenario, FeatureCache, ItemKind, MultiQuestionTargets, ScenarioFeatures};
 
-type Backend = Flex<f32, i32>;
+fn scenario(id: &str, ctx_len: usize, kinds: Vec<ItemKind>, d: usize) -> CachedScenario {
+    let n = kinds.len();
+    CachedScenario {
+        id: id.into(),
+        is_benign: id.ends_with('b'),
+        targets: MultiQuestionTargets::new().with_choice_target(1).with_noul_target(0.25).with_score_target(3.5),
+        features: ScenarioFeatures {
+            d_model: d,
+            ctx: (0..ctx_len * d).map(|i| (i as f32 * 0.37).sin() * 3.0).collect(),
+            ctx_len,
+            items: (0..n * d).map(|i| (i as f32 * 0.11).cos()).collect(),
+            kinds,
+        },
+    }
+}
 
 #[test]
 fn test_feature_cache_roundtrip() {
-    let device = FlexDevice;
-    let temp_dir = PathBuf::from("target/test_cache_roundtrip");
-    let _ = fs::remove_dir_all(&temp_dir);
-    fs::create_dir_all(&temp_dir).unwrap();
+    let d = 8;
+    let dir = std::env::temp_dir().join(format!("burn_mamba_cache_test_{}", std::process::id()));
+    let (st_path, meta_path) = FeatureCache::cache_paths(&dir, std::path::Path::new("train.jsonl"), "enc/abc:1");
+    let scenarios = vec![
+        scenario(
+            "s1b",
+            5,
+            vec![
+                ItemKind::Choice { question: 0, candidate: 0 },
+                ItemKind::Choice { question: 0, candidate: 1 },
+                ItemKind::Noul { index: 0 },
+                ItemKind::Score { index: 0 },
+            ],
+            d,
+        ),
+        scenario("s2a", 3, vec![], d),
+    ];
 
-    let d_model = 64;
-    let cls_tensor = Tensor::<Backend, 2>::from_data(
-        TensorData::new(vec![0.5f32; d_model], vec![1, d_model]),
-        &device,
-    );
-    let choice_1 = Tensor::<Backend, 2>::from_data(
-        TensorData::new(vec![0.1f32; 3 * d_model], vec![3, d_model]),
-        &device,
-    );
-    let choice_2 = Tensor::<Backend, 2>::from_data(
-        TensorData::new(vec![0.2f32; 2 * d_model], vec![2, d_model]),
-        &device,
-    );
-    let noul_tensor = Tensor::<Backend, 2>::from_data(
-        TensorData::new(vec![0.8f32; 2 * d_model], vec![2, d_model]),
-        &device,
-    );
-    let score_tensor = Tensor::<Backend, 2>::from_data(
-        TensorData::new(vec![0.9f32; 2 * d_model], vec![2, d_model]),
-        &device,
-    );
+    FeatureCache::save_to_disk(&scenarios, &st_path, &meta_path, "hash".into(), "enc/abc:1".into(), d).unwrap();
+    assert!(FeatureCache::is_cache_valid(&st_path, &meta_path, "hash", "enc/abc:1", d));
+    assert!(!FeatureCache::is_cache_valid(&st_path, &meta_path, "other", "enc/abc:1", d));
+    assert!(!FeatureCache::is_cache_valid(&st_path, &meta_path, "hash", "enc/xyz", d));
+    assert!(!FeatureCache::is_cache_valid(&st_path, &meta_path, "hash", "enc/abc:1", d + 1));
 
-    let scenario = CachedScenario {
-        id: "scen_test_01".to_string(),
-        cls_state: cls_tensor,
-        choice_questions: vec![choice_1, choice_2],
-        noul_states: Some(noul_tensor),
-        score_states: Some(score_tensor),
-        targets: MultiQuestionTargets::new()
-            .with_choice_target(0)
-            .with_choice_target(1)
-            .with_noul_target(1.0)
-            .with_noul_target(0.0)
-            .with_score_target(4.5)
-            .with_score_target(3.2),
-        is_benign: true,
-    };
-
-    let safetensors_path = temp_dir.join("test.safetensors");
-    let meta_path = temp_dir.join("test.meta.json");
-    let dataset_hash = "fake_hash_123".to_string();
-    let model_id = "test_model_v1".to_string();
-
-    // 1. Save to disk
-    FeatureCache::save_to_disk(
-        &[scenario],
-        &safetensors_path,
-        &meta_path,
-        dataset_hash.clone(),
-        model_id.clone(),
-        d_model,
-    )
-    .expect("Save to disk must succeed");
-
-    assert!(safetensors_path.exists());
-    assert!(meta_path.exists());
-
-    // 2. Validate cache validation checks
-    assert!(FeatureCache::is_cache_valid(
-        &safetensors_path,
-        &meta_path,
-        &dataset_hash,
-        &model_id,
-        d_model
-    ));
-    assert!(!FeatureCache::is_cache_valid(
-        &safetensors_path,
-        &meta_path,
-        "wrong_hash",
-        &model_id,
-        d_model
-    ));
-
-    // 3. Load from disk
-    let loaded: Vec<CachedScenario<Backend>> =
-        FeatureCache::load_from_disk(&safetensors_path, &meta_path, &device)
-            .expect("Load from disk must succeed");
-
-    assert_eq!(loaded.len(), 1);
-    let l = &loaded[0];
-    assert_eq!(l.id, "scen_test_01");
-    assert_eq!(l.cls_state.dims(), [1, d_model]);
-    assert_eq!(l.choice_questions.len(), 2);
-    assert_eq!(l.choice_questions[0].dims(), [3, d_model]);
-    assert_eq!(l.choice_questions[1].dims(), [2, d_model]);
-    assert_eq!(l.noul_states.as_ref().unwrap().dims(), [2, d_model]);
-    assert_eq!(l.score_states.as_ref().unwrap().dims(), [2, d_model]);
-    assert_eq!(l.targets.choice_targets, vec![0, 1]);
-    assert_eq!(l.targets.noul_targets, vec![1.0, 0.0]);
-    assert_eq!(l.targets.score_targets, vec![4.5, 3.2]);
-    assert!(l.is_benign);
-
-    let _ = fs::remove_dir_all(&temp_dir);
+    let loaded = FeatureCache::load_from_disk(&st_path, &meta_path).unwrap();
+    assert_eq!(loaded.len(), 2);
+    for (a, b) in scenarios.iter().zip(&loaded) {
+        assert_eq!(a.id, b.id);
+        assert_eq!(a.is_benign, b.is_benign);
+        assert_eq!(a.targets, b.targets);
+        assert_eq!(a.features.kinds, b.features.kinds);
+        assert_eq!(a.features.ctx_len, b.features.ctx_len);
+        // Stored as f16.
+        for (x, y) in a.features.ctx.iter().chain(&a.features.items).zip(b.features.ctx.iter().chain(&b.features.items)) {
+            assert!((x - y).abs() <= 2e-3 * x.abs().max(1.0), "{x} vs {y}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

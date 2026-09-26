@@ -1,8 +1,8 @@
-//! Tier 1 reflex inference: loads a backbone plus a heads artifact and emits one JSON
-//! verdict per input scenario.
+//! Tier 1 reflex inference: loads the frozen ModernBERT encoder plus a trained decision
+//! artifact and emits one JSON verdict per input scenario.
 //!
 //! ```text
-//! reflex [--backend cpu|wgpu] --backbone <st> --heads <st> --tokenizer <json> [--input <jsonl>]   # stdin if omitted
+//! reflex [--backend cpu|wgpu] --encoder <dir> --artifact <st> [--tokenizer <json>] [--input <jsonl>]   # stdin if omitted
 //! ```
 //!
 //! Each input line is a [`ReflexRequest`] (dataset records work too; labels are ignored).
@@ -20,7 +20,7 @@ use serde::Serialize;
 use tokenizers::Tokenizer;
 
 use burn_mamba::backend::{BackendKind, CpuBackend, FlexDevice};
-use burn_mamba::{CoordinateResolver, Mamba2CheckpointLoader, ReflexEngine, ReflexRequest, ReflexVerdict};
+use burn_mamba::{load_artifact, sha256_file, ModernBertLoader, ReflexEngine, ReflexRequest, ReflexVerdict};
 
 #[derive(Parser)]
 #[command(version, about = "Run Tier 1 reflex inference over JSONL scenarios")]
@@ -28,15 +28,15 @@ struct Cli {
     /// Tensor backend to run on.
     #[arg(long, value_enum, default_value_t = BackendKind::Cpu)]
     backend: BackendKind,
-    /// Mamba-2 backbone checkpoint the heads were trained on.
+    /// ModernBERT directory (config.json, model.safetensors, tokenizer.json) the artifact was trained on.
     #[arg(long)]
-    backbone: PathBuf,
-    /// Heads artifact produced by reflex-train.
+    encoder: PathBuf,
+    /// Decision artifact produced by reflex-train.
     #[arg(long)]
-    heads: PathBuf,
-    /// HuggingFace tokenizer.json matching the backbone.
+    artifact: PathBuf,
+    /// tokenizer.json; defaults to the one in the encoder directory.
     #[arg(long)]
-    tokenizer: PathBuf,
+    tokenizer: Option<PathBuf>,
     /// JSONL input; reads stdin when omitted.
     #[arg(long)]
     input: Option<PathBuf>,
@@ -76,32 +76,34 @@ fn dispatch(cli: Cli) -> Result<usize, Box<dyn std::error::Error>> {
 }
 
 fn run<B: Backend>(cli: Cli, device: B::Device) -> Result<usize, Box<dyn std::error::Error>> {
-    let tokenizer = Tokenizer::from_file(&cli.tokenizer)
-        .map_err(|e| format!("failed to load tokenizer {}: {e}", cli.tokenizer.display()))?;
+    let loaded = ModernBertLoader::load_dir::<B, _>(&cli.encoder, &device)
+        .map_err(|e| format!("failed to load encoder {}: {e}", cli.encoder.display()))?;
+    let tokenizer_path = cli
+        .tokenizer
+        .clone()
+        .or(loaded.tokenizer_path.clone())
+        .ok_or("no --tokenizer given and the encoder directory has no tokenizer.json")?;
+    let tokenizer = Tokenizer::from_file(&tokenizer_path)
+        .map_err(|e| format!("failed to load tokenizer {}: {e}", tokenizer_path.display()))?;
+    let tokenizer_sha = sha256_file(&tokenizer_path)?;
 
-    let loaded = Mamba2CheckpointLoader::load_backbone_file::<B, _>(&cli.backbone, &device)
-        .map_err(|e| format!("failed to load backbone {}: {e}", cli.backbone.display()))?;
-    let (heads, metadata) =
-        Mamba2CheckpointLoader::load_heads_file::<B, _>(&cli.heads, &loaded.sha256, &device)
-            .map_err(|e| format!("failed to load heads {}: {e}", cli.heads.display()))?;
-    if metadata.d_model != loaded.config.d_model {
+    let (decision, metadata) = load_artifact::<B, _>(&cli.artifact, &loaded.sha256, &tokenizer_sha, &device)
+        .map_err(|e| format!("failed to load artifact {}: {e}", cli.artifact.display()))?;
+    if metadata.model.reader.d_in != loaded.config.hidden_size {
         return Err(format!(
-            "heads expect d_model={}, backbone has {}",
-            metadata.d_model, loaded.config.d_model
+            "artifact expects encoder width {}, encoder has {}",
+            metadata.model.reader.d_in, loaded.config.hidden_size
         )
         .into());
     }
-    let delimiters = metadata.delimiters;
-    let mut model = loaded.model;
-    model.heads = heads;
-    let engine = ReflexEngine::new(model, CoordinateResolver::new(delimiters.clone()));
     eprintln!(
-        "[reflex] backend {} backbone d_model={} layers={}, heads {}",
+        "[reflex] backend {} encoder d_model={} layers={}, artifact {}",
         cli.backend,
-        loaded.config.d_model,
-        loaded.config.n_layers,
-        cli.heads.display()
+        loaded.config.hidden_size,
+        loaded.config.num_hidden_layers,
+        cli.artifact.display()
     );
+    let engine = ReflexEngine::new(loaded.model, decision, metadata.encoding, tokenizer);
 
     let input: Box<dyn BufRead> = match cli.input {
         Some(ref path) => Box::new(BufReader::new(
@@ -128,10 +130,7 @@ fn run<B: Backend>(cli: Cli, device: B::Device) -> Result<usize, Box<dyn std::er
             }
         };
         let id = request.id.as_deref();
-        let result = request
-            .encode(&tokenizer, &delimiters)
-            .map_err(|e| e.to_string())
-            .and_then(|tokens| engine.evaluate(&tokens, &device).map_err(|e| e.to_string()));
+        let result = engine.evaluate(&request, &device).map_err(|e| e.to_string());
         match result {
             Ok(ref verdict) => serde_json::to_writer(&mut out, &Output::Verdict { id, verdict })?,
             Err(error) => {

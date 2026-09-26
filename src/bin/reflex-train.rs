@@ -1,13 +1,17 @@
-//! Trains the JEV reflex heads on a frozen Mamba-2 backbone and writes a heads-only artifact.
+//! Trains the Tier 1 decision model (item reader + JEV heads) on a frozen ModernBERT encoder
+//! and writes a decision artifact.
 //!
 //! ```text
-//! reflex-train [--backend cpu|wgpu] --backbone <st> --tokenizer <json> --train <jsonl> [--val <jsonl>] --out heads.safetensors
-//! reflex-train eval [--backend cpu|wgpu] --backbone <st> --heads <st> --tokenizer <json> --data <jsonl>
+//! reflex-train [--backend cpu|wgpu] --encoder <dir> --train <jsonl> --val <jsonl> --out <st> [options]
+//! reflex-train eval [--backend cpu|wgpu] --encoder <dir> --artifact <st> --data <jsonl> [--baseline-from <jsonl>]
 //! ```
+//!
+//! Training runs on Burn's supervised trainer (TUI when attached to a terminal); logs,
+//! metrics and checkpoints land in `--runs-dir/<timestamp>`.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use burn::backend::Autodiff;
 use burn::tensor::backend::Backend;
@@ -16,18 +20,19 @@ use tokenizers::Tokenizer;
 
 use burn_mamba::backend::{BackendKind, CpuBackend, FlexDevice};
 use burn_mamba::training::{
-    evaluate_dataset, get_or_compute_features, train_heads, CacheOutcome, CacheSettings,
+    evaluate_dataset, get_or_compute_features, train_decision_model, CacheOutcome, CacheSettings,
     FeatureContext, TrainConfig,
 };
 use burn_mamba::{
-    CoordinateResolver, DelimiterConfig, EvalReport, HeadsMetadata, JevDataset,
-    Mamba2CheckpointLoader, ReflexEngine,
+    load_artifact, save_artifact, sha256_file, ArtifactMetadata, Baselines, CachedScenario,
+    DecisionModelConfig, EncodingConfig, EvalReport, ItemReaderConfig, JevDataset, LoadedEncoder,
+    ModernBertLoader, ReflexEngine, UnifiedHeadsConfig,
 };
 
 type AppResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Parser)]
-#[command(version, about = "Train JEV reflex heads on a frozen Mamba-2 backbone")]
+#[command(version, about = "Train the Tier 1 decision model on a frozen ModernBERT encoder")]
 #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
 struct Cli {
     #[command(subcommand)]
@@ -38,91 +43,106 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Evaluate an existing heads artifact on a labeled dataset without retraining.
+    /// Evaluate an existing artifact on a labeled dataset without retraining.
     Eval(EvalArgs),
 }
 
 #[derive(Args)]
-struct TrainArgs {
+struct EncoderArgs {
     /// Tensor backend to run on.
     #[arg(long, value_enum, default_value_t = BackendKind::Cpu)]
     backend: BackendKind,
-    /// Frozen Mamba-2 backbone checkpoint (safetensors).
+    /// ModernBERT directory (config.json, model.safetensors, tokenizer.json).
     #[arg(long, required = true)]
-    backbone: Option<PathBuf>,
-    /// HuggingFace tokenizer.json matching the backbone.
-    #[arg(long, required = true)]
+    encoder: Option<PathBuf>,
+    /// tokenizer.json; defaults to the one in the encoder directory.
+    #[arg(long)]
     tokenizer: Option<PathBuf>,
+}
+
+#[derive(Args)]
+struct TrainArgs {
+    #[command(flatten)]
+    enc: EncoderArgs,
     /// Training scenarios (JSONL).
     #[arg(long, required = true)]
     train: Option<PathBuf>,
-    /// Held-out scenarios (JSONL) evaluated after training.
-    #[arg(long)]
+    /// Validation scenarios (JSONL); drives early stopping and best-epoch selection.
+    #[arg(long, required = true)]
     val: Option<PathBuf>,
-    /// Output path for the heads-only artifact.
+    /// Output path for the decision artifact.
     #[arg(long, required = true)]
     out: Option<PathBuf>,
-    #[arg(long, default_value_t = 50)]
+    #[arg(long, default_value_t = 60)]
     epochs: usize,
-    #[arg(long, default_value_t = 0.02)]
+    /// Peak learning rate (after warmup).
+    #[arg(long, default_value_t = 3e-4)]
     lr: f64,
-    /// Scenarios per optimizer step. The metric loss needs at least 2 benign and 1 adversarial
-    /// scenario in a batch to be non-zero.
-    #[arg(long, default_value_t = 4, value_parser = parse_batch_size)]
+    #[arg(long, default_value_t = 1e-2)]
+    weight_decay: f32,
+    /// Scenarios per optimizer step.
+    #[arg(long, default_value_t = 16, value_parser = parse_positive)]
     batch_size: usize,
-    /// Seed for head initialization; set it for reproducible runs.
-    #[arg(long)]
-    seed: Option<u64>,
-    /// Directory for the persistent backbone feature cache.
+    /// Epochs without validation improvement before stopping.
+    #[arg(long, default_value_t = 8)]
+    patience: usize,
+    #[arg(long, default_value_t = 42)]
+    seed: u64,
+    /// Longest encoder input; only the context is truncated to fit.
+    #[arg(long, default_value_t = 2048)]
+    max_seq_len: usize,
+    /// Reader width.
+    #[arg(long, default_value_t = 128)]
+    reader_dim: usize,
+    /// Cross-attention blocks; 0 = mean-pool probe (ablation).
+    #[arg(long, default_value_t = 2)]
+    reader_blocks: usize,
+    #[arg(long, default_value_t = 4)]
+    reader_heads: usize,
+    /// Dropout in the reader and heads.
+    #[arg(long, default_value_t = 0.25)]
+    dropout: f64,
+    /// Fraction of context tokens hidden from the reader per training step.
+    #[arg(long, default_value_t = 0.1)]
+    ctx_token_drop: f64,
+    /// Directory for the persistent encoder feature cache.
     #[arg(long, default_value = "data/.cache")]
     cache_dir: PathBuf,
-    /// Recompute backbone features and do not write the cache.
+    /// Recompute encoder features and do not write the cache.
     #[arg(long)]
     no_cache: bool,
-    /// Also write a full checkpoint (backbone + heads) to this path.
-    #[arg(long)]
-    export_full: Option<PathBuf>,
+    /// Parent directory for per-run trainer logs and checkpoints.
+    #[arg(long, default_value = "data/.runs")]
+    runs_dir: PathBuf,
 }
 
 #[derive(Args)]
 struct EvalArgs {
-    /// Tensor backend to run on.
-    #[arg(long, value_enum, default_value_t = BackendKind::Cpu)]
-    backend: BackendKind,
+    #[command(flatten)]
+    enc: EncoderArgs,
     #[arg(long)]
-    backbone: PathBuf,
-    #[arg(long)]
-    heads: PathBuf,
-    #[arg(long)]
-    tokenizer: PathBuf,
+    artifact: PathBuf,
     /// Labeled scenarios (JSONL).
     #[arg(long)]
     data: PathBuf,
+    /// Dataset whose label statistics define the baselines (normally the training set);
+    /// defaults to `--data` itself.
+    #[arg(long)]
+    baseline_from: Option<PathBuf>,
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let result = match cli.command {
-        Some(Command::Eval(args)) => match args.backend {
-            BackendKind::Cpu => run_eval::<CpuBackend>(args, FlexDevice),
-            #[cfg(feature = "wgpu")]
-            BackendKind::Wgpu => run_eval::<burn_mamba::backend::GpuWgpu>(
-                args,
-                burn_mamba::backend::WgpuDevice::default(),
-            ),
-            #[allow(unreachable_patterns)]
-            other => Err(other.not_compiled()),
-        },
-        None => match cli.train.backend {
-            BackendKind::Cpu => run_train::<CpuBackend>(cli.train, FlexDevice),
-            #[cfg(feature = "wgpu")]
-            BackendKind::Wgpu => run_train::<burn_mamba::backend::GpuWgpu>(
-                cli.train,
-                burn_mamba::backend::WgpuDevice::default(),
-            ),
-            #[allow(unreachable_patterns)]
-            other => Err(other.not_compiled()),
-        },
+    let backend = match cli.command {
+        Some(Command::Eval(ref a)) => a.enc.backend,
+        None => cli.train.enc.backend,
+    };
+    let result = match backend {
+        BackendKind::Cpu => dispatch::<CpuBackend>(cli, FlexDevice),
+        #[cfg(feature = "wgpu")]
+        BackendKind::Wgpu => dispatch::<burn_mamba::backend::GpuWgpu>(cli, burn_mamba::backend::WgpuDevice::default()),
+        #[allow(unreachable_patterns)]
+        other => Err(other.not_compiled()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -133,22 +153,23 @@ fn main() -> ExitCode {
     }
 }
 
-fn parse_batch_size(s: &str) -> Result<usize, String> {
+fn dispatch<B: Backend>(cli: Cli, device: B::Device) -> AppResult<()> {
+    match cli.command {
+        Some(Command::Eval(args)) => run_eval::<B>(args, device),
+        None => run_train::<B>(cli.train, device),
+    }
+}
+
+fn parse_positive(s: &str) -> Result<usize, String> {
     match s.parse::<usize>() {
-        Ok(0) => Err("batch size must be at least 1".into()),
+        Ok(0) => Err("must be at least 1".into()),
         Ok(n) => Ok(n),
         Err(e) => Err(e.to_string()),
     }
 }
 
-fn load_tokenizer(path: &PathBuf) -> AppResult<Tokenizer> {
-    Tokenizer::from_file(path)
-        .map_err(|e| format!("failed to load tokenizer {}: {e}", path.display()).into())
-}
-
-fn load_dataset(path: &PathBuf) -> AppResult<JevDataset> {
-    let ds = JevDataset::from_jsonl_file(path)
-        .map_err(|e| format!("failed to load dataset {}: {e}", path.display()))?;
+fn load_dataset(path: &Path) -> AppResult<JevDataset> {
+    let ds = JevDataset::from_jsonl_file(path).map_err(|e| format!("failed to load dataset {}: {e}", path.display()))?;
     if ds.is_empty() {
         return Err(format!("dataset {} contains no scenarios", path.display()).into());
     }
@@ -156,167 +177,160 @@ fn load_dataset(path: &PathBuf) -> AppResult<JevDataset> {
     Ok(ds)
 }
 
-fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
-    // `required = true` guarantees these are present when no subcommand is given.
-    let backbone_path = args.backbone.unwrap();
-    let tokenizer_path = args.tokenizer.unwrap();
-    let train_path = args.train.unwrap();
-    let out_path = args.out.unwrap();
+/// Encoder, tokenizer and their identities.
+struct EncoderBundle<B: Backend> {
+    loaded: LoadedEncoder<B>,
+    tokenizer: Tokenizer,
+    tokenizer_sha: String,
+}
 
-    let tokenizer = load_tokenizer(&tokenizer_path)?;
-    let train_ds = load_dataset(&train_path)?;
-    let val_ds = args.val.as_ref().map(load_dataset).transpose()?;
-
-    eprintln!("[backbone] loading {} (backend {})", backbone_path.display(), args.backend);
-    let loaded = Mamba2CheckpointLoader::load_backbone_file::<B, _>(&backbone_path, &device)
-        .map_err(|e| format!("failed to load backbone {}: {e}", backbone_path.display()))?;
-    let config = loaded.config;
+fn load_encoder<B: Backend>(args: &EncoderArgs, device: &B::Device) -> AppResult<EncoderBundle<B>> {
+    let dir = args.encoder.as_ref().expect("clap enforces --encoder");
+    eprintln!("[encoder] loading {} (backend {})", dir.display(), args.backend);
+    let loaded = ModernBertLoader::load_dir::<B, _>(dir, device)
+        .map_err(|e| format!("failed to load encoder {}: {e}", dir.display()))?;
+    let tokenizer_path = args
+        .tokenizer
+        .clone()
+        .or(loaded.tokenizer_path.clone())
+        .ok_or("no --tokenizer given and the encoder directory has no tokenizer.json")?;
+    let tokenizer = Tokenizer::from_file(&tokenizer_path)
+        .map_err(|e| format!("failed to load tokenizer {}: {e}", tokenizer_path.display()))?;
+    let c = &loaded.config;
     eprintln!(
-        "[backbone] d_model={} layers={} vocab={} ({} parameters, sha256 {})",
-        config.d_model, config.n_layers, config.vocab_size, loaded.report.parameters_transferred, loaded.sha256
+        "[encoder] d_model={} layers={} heads={} vocab={} ({} parameters, sha256 {})",
+        c.hidden_size, c.num_hidden_layers, c.num_attention_heads, c.vocab_size, loaded.report.parameters_transferred, loaded.sha256
     );
+    Ok(EncoderBundle {
+        tokenizer_sha: sha256_file(&tokenizer_path)?,
+        loaded,
+        tokenizer,
+    })
+}
 
-    let delimiters = DelimiterConfig::mamba2_reserved();
-    if delimiters.max_token_id() >= config.vocab_size as i64 {
-        return Err(format!(
-            "delimiter token id {} is outside the backbone vocabulary ({})",
-            delimiters.max_token_id(),
-            config.vocab_size
-        )
-        .into());
-    }
-    let resolver = CoordinateResolver::new(delimiters.clone());
-
+fn features_for<B: Backend>(
+    enc: &EncoderBundle<B>,
+    encoding: &EncodingConfig,
+    dataset: &JevDataset,
+    path: &Path,
+    cache: &CacheSettings<'_>,
+    device: &B::Device,
+) -> AppResult<Vec<CachedScenario>> {
     let ctx = FeatureContext {
-        backbone: &loaded.model,
-        tokenizer: &tokenizer,
-        resolver: &resolver,
-    };
-    let cache_model_id = args.backend.cache_model_id(&loaded.sha256);
-    let cache = CacheSettings {
-        dir: &args.cache_dir,
-        model_id: &cache_model_id,
-        enabled: !args.no_cache,
+        encoder: &enc.loaded.model,
+        tokenizer: &enc.tokenizer,
+        encoding,
     };
     let start = Instant::now();
-    let mut computed_any = false;
-    let (features, outcome) = get_or_compute_features::<Autodiff<B>>(
-        &ctx,
-        &train_ds,
-        &train_path,
-        &cache,
-        &device,
-        |done, total| {
-            if !computed_any {
-                computed_any = true;
-                eprintln!("[features] computing backbone features for {total} scenarios");
-            }
-            if done % 25 == 0 || done == total {
-                let elapsed = start.elapsed().as_secs_f64();
-                let eta = elapsed / done as f64 * (total - done) as f64;
-                eprint!("\r[features] {done}/{total} ({elapsed:.1}s, ETA {eta:.0}s)");
-                if done == total {
-                    eprintln!();
-                }
-            }
-        },
-    )?;
+    let (features, outcome) = get_or_compute_features(&ctx, dataset, path, cache, device, |done, total| {
+        let elapsed = start.elapsed().as_secs_f64();
+        let eta = elapsed / done as f64 * (total - done) as f64;
+        eprint!("\r[features] {}: {done}/{total} ({elapsed:.1}s, ETA {eta:.0}s)", path.display());
+        if done == total {
+            eprintln!();
+        }
+    })?;
     let how = match outcome {
         CacheOutcome::Hit => "loaded from cache",
         CacheOutcome::MissSaved => "computed and cached",
         CacheOutcome::Disabled => "computed (cache disabled)",
     };
-    eprintln!(
-        "[features] {} scenarios {how} in {:.2}s",
-        features.len(),
-        start.elapsed().as_secs_f64()
-    );
+    eprintln!("[features] {} scenarios {how} in {:.2}s", features.len(), start.elapsed().as_secs_f64());
+    Ok(features)
+}
 
-    let heads_config = config.heads_config();
+fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
+    // `required = true` guarantees these are present when no subcommand is given.
+    let train_path = args.train.clone().unwrap();
+    let val_path = args.val.clone().unwrap();
+    let out_path = args.out.clone().unwrap();
+
+    let train_ds = load_dataset(&train_path)?;
+    let val_ds = load_dataset(&val_path)?;
+    let enc = load_encoder::<B>(&args.enc, &device)?;
+    let encoding = EncodingConfig::for_encoder(&enc.loaded.config).with_max_seq_len(args.max_seq_len);
+
+    let cache_key = args.enc.backend.cache_key(&enc.loaded.sha256, &enc.tokenizer_sha, encoding.max_seq_len);
+    let cache = CacheSettings {
+        dir: &args.cache_dir,
+        model_id: &cache_key,
+        enabled: !args.no_cache,
+    };
+    let train_features = features_for(&enc, &encoding, &train_ds, &train_path, &cache, &device)?;
+    let val_features = features_for(&enc, &encoding, &val_ds, &val_path, &cache, &device)?;
+
+    let reader = ItemReaderConfig::new(enc.loaded.config.hidden_size)
+        .with_d_reader(args.reader_dim)
+        .with_n_blocks(args.reader_blocks)
+        .with_n_heads(args.reader_heads)
+        .with_dropout(args.dropout)
+        .with_ctx_token_drop(args.ctx_token_drop);
+    let model_config = DecisionModelConfig::with_reader(reader, UnifiedHeadsConfig::new(args.reader_dim).with_dropout(args.dropout));
+    let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let train_config = TrainConfig {
         epochs: args.epochs,
         lr: args.lr,
+        weight_decay: args.weight_decay,
         batch_size: args.batch_size,
+        patience: args.patience,
         seed: args.seed,
+        run_dir: args.runs_dir.join(format!("{stamp}-seed{}", args.seed)),
         ..TrainConfig::default()
     };
     eprintln!(
-        "\n[train] Adam lr={} epochs={} batch={} seed={:?}",
-        train_config.lr, train_config.epochs, train_config.batch_size, train_config.seed
+        "\n[train] AdamW lr={} wd={} epochs<={} batch={} patience={} seed={} reader={}x{} blocks, {} heads, ctx-token-drop={}; run dir {}",
+        train_config.lr,
+        train_config.weight_decay,
+        train_config.epochs,
+        train_config.batch_size,
+        train_config.patience,
+        train_config.seed,
+        args.reader_dim,
+        args.reader_blocks,
+        args.reader_heads,
+        args.ctx_token_drop,
+        train_config.run_dir.display()
     );
-    eprintln!(" Epoch | Total Loss | Choice Loss | Noul Loss | Score Loss | Metric Loss | Calib Loss");
-    eprintln!("-------+------------+-------------+-----------+------------+-------------+-----------");
     let start = Instant::now();
-    let epochs = train_config.epochs;
-    let mut zero_metric_epochs = 0usize;
-    let output = train_heads(&features, &heads_config, &train_config, &device, |epoch, b| {
-        if b.metric_loss == 0.0 {
-            zero_metric_epochs += 1;
-        }
-        if epoch == 1 || epoch % 10 == 0 || epoch == epochs {
-            eprintln!(
-                " {:>5} | {:>10.4} | {:>11.4} | {:>9.4} | {:>10.4} | {:>11.4} | {:>10.4}",
-                epoch, b.total_loss, b.choice_loss, b.noul_loss, b.score_loss, b.metric_loss, b.calibration_loss
-            );
-        }
-    });
-    eprintln!("[train] done in {:.2}s", start.elapsed().as_secs_f64());
-    if zero_metric_epochs > 0 {
-        eprintln!(
-            "[train] warning: metric loss was 0 in {zero_metric_epochs}/{epochs} epochs; no batch had \
-             2+ benign and 1+ adversarial scenarios, so the k-NN head got no gradient then"
-        );
-    }
-
-    let metadata = HeadsMetadata::new(&heads_config, delimiters, loaded.sha256.clone());
-    Mamba2CheckpointLoader::save_heads_file(&output.heads, &metadata, &out_path)?;
+    let output = train_decision_model::<Autodiff<B>>(train_features, val_features, &model_config, &train_config, &device)?;
     eprintln!(
-        "\n[export] heads -> {} ({:.2} KB)",
+        "[train] done in {:.1}s; best epoch {} (by validation selection loss)",
+        start.elapsed().as_secs_f64(),
+        output.best_epoch
+    );
+    let [tc, tn, ts] = output.temperatures;
+    eprintln!("[train] calibration temperatures: choice={tc:.3} noul={tn:.3} score={ts:.3}");
+
+    let mut metadata = ArtifactMetadata::new(model_config, encoding.clone(), enc.loaded.sha256.clone(), enc.tokenizer_sha.clone());
+    metadata.best_epoch = Some(output.best_epoch);
+    save_artifact(&output.model, &metadata, &out_path)?;
+    eprintln!(
+        "[export] decision artifact -> {} ({:.2} KB)",
         out_path.display(),
         out_path.metadata()?.len() as f64 / 1024.0
     );
 
-    let mut model = loaded.model;
-    model.heads = output.heads;
-    if let Some(ref full_path) = args.export_full {
-        model.save_safetensors_file(full_path)?;
-        eprintln!(
-            "[export] full model -> {} ({:.2} MB)",
-            full_path.display(),
-            full_path.metadata()?.len() as f64 / 1_048_576.0
-        );
-    }
-
-    if let Some(val_ds) = val_ds {
-        let engine = ReflexEngine::new(model, resolver);
-        let report = evaluate_dataset(&engine, &val_ds, &tokenizer, &device)?;
-        print_report(&report);
-    }
+    // End-to-end check through the inference path (encoder → features → decision model).
+    let baselines = Baselines::compute(&train_ds, &val_ds);
+    let engine = ReflexEngine::new(enc.loaded.model, output.model, encoding, enc.tokenizer);
+    let report = evaluate_dataset(&engine, &val_ds, &device)?;
+    print_report(&report, &baselines, "train");
     Ok(())
 }
 
 fn run_eval<B: Backend>(args: EvalArgs, device: B::Device) -> AppResult<()> {
-    let tokenizer = load_tokenizer(&args.tokenizer)?;
     let dataset = load_dataset(&args.data)?;
-
-    let loaded = Mamba2CheckpointLoader::load_backbone_file::<B, _>(&args.backbone, &device)
-        .map_err(|e| format!("failed to load backbone {}: {e}", args.backbone.display()))?;
-    let (heads, metadata) =
-        Mamba2CheckpointLoader::load_heads_file::<B, _>(&args.heads, &loaded.sha256, &device)
-            .map_err(|e| format!("failed to load heads {}: {e}", args.heads.display()))?;
-    if metadata.d_model != loaded.config.d_model {
-        return Err(format!(
-            "heads expect d_model={}, backbone has {}",
-            metadata.d_model, loaded.config.d_model
-        )
-        .into());
-    }
-
-    let mut model = loaded.model;
-    model.heads = heads;
-    let engine = ReflexEngine::new(model, CoordinateResolver::new(metadata.delimiters));
-    let report = evaluate_dataset(&engine, &dataset, &tokenizer, &device)?;
-    print_report(&report);
+    let baselines = match args.baseline_from {
+        Some(ref path) => Baselines::compute(&load_dataset(path)?, &dataset),
+        None => Baselines::compute(&dataset, &dataset),
+    };
+    let enc = load_encoder::<B>(&args.enc, &device)?;
+    let (decision, metadata) = load_artifact::<B, _>(&args.artifact, &enc.loaded.sha256, &enc.tokenizer_sha, &device)
+        .map_err(|e| format!("failed to load artifact {}: {e}", args.artifact.display()))?;
+    let engine = ReflexEngine::new(enc.loaded.model, decision, metadata.encoding, enc.tokenizer);
+    let report = evaluate_dataset(&engine, &dataset, &device)?;
+    let source = if args.baseline_from.is_some() { "reference" } else { "eval set itself" };
+    print_report(&report, &baselines, source);
     Ok(())
 }
 
@@ -324,7 +338,7 @@ fn pass(ok: bool) -> &'static str {
     if ok { "PASS" } else { "FAIL" }
 }
 
-fn print_report(report: &EvalReport) {
+fn print_report(report: &EvalReport, baselines: &Baselines, baseline_source: &str) {
     println!("\n=== Validation ===");
     for s in &report.scenarios {
         println!("\n--- {} [{}] ---", s.id, s.domain.as_deref().unwrap_or("general"));
@@ -362,12 +376,30 @@ fn print_report(report: &EvalReport) {
     let (cc, ct) = report.choice_counts();
     let (nc, nt) = report.noul_counts();
     let pct = |v: Option<f64>| v.map_or("n/a".to_string(), |v| format!("{:.1}%", v * 100.0));
-    println!("\n=== Summary ===");
-    println!(" Choice accuracy: {} ({cc}/{ct})", pct(report.choice_accuracy()));
-    println!(" Noul accuracy:   {} ({nc}/{nt})", pct(report.noul_accuracy()));
+    let num = |v: Option<f32>| v.map_or("n/a".to_string(), |v| format!("{v:.3}"));
+    println!("\n=== Summary (baselines from {baseline_source}) ===");
     println!(
-        " Score RMSE:      {} across {} rubric queries",
-        report.score_rmse().map_or("n/a".to_string(), |v| format!("{v:.3}")),
-        report.score_count()
+        " Choice accuracy: {:>7} ({cc}/{ct})   uniform {}, longest-candidate {}",
+        pct(report.choice_accuracy()),
+        pct(baselines.choice_uniform),
+        pct(baselines.choice_longest)
+    );
+    println!(
+        " Noul accuracy:   {:>7} ({nc}/{nt})   always-{} {}",
+        pct(report.noul_accuracy()),
+        baselines.noul_majority_label,
+        pct(baselines.noul_majority)
+    );
+    println!(
+        " Score RMSE:      {:>7} ({} rubrics)   predict-mean({:.2}) {}",
+        num(report.score_rmse()),
+        report.score_count(),
+        baselines.score_reference_mean,
+        num(baselines.score_mean_rmse)
+    );
+    println!(
+        " Calibration ECE: choice {}, noul {} (10 bins)",
+        pct(report.choice_ece()),
+        pct(report.noul_ece())
     );
 }

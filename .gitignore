@@ -3,3 +3,5 @@
 models/**/*.safetensors
 models/_archive/
 data/.cache/
+tests/fixtures/*.safetensors
+data/.runs

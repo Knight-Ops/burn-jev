@@ -1,5 +1,5 @@
 use burn_mamba::{
-    ChoiceQuestionRecord, DelimiterConfig, JevDataset, JevScenarioRecord, NoulQueryRecord,
+    ChoiceQuestionRecord, EncodingConfig, JevDataset, JevScenarioRecord, NoulQueryRecord,
     ScoreRubricRecord,
 };
 use tokenizers::Tokenizer;
@@ -77,19 +77,12 @@ fn test_dataset_split() {
 
 #[test]
 fn test_dataset_encode_with_tokenizer() {
-    let tokenizer_path = std::path::Path::new("models/tokenizer.json");
+    let tokenizer_path = std::path::Path::new("models/modernbert-base/tokenizer.json");
     if !tokenizer_path.exists() {
         return;
     }
     let tokenizer = Tokenizer::from_file(tokenizer_path).unwrap();
-    let cfg = DelimiterConfig::default()
-        .with_cls_id(50280)
-        .with_sep_id(50281)
-        .with_eos_id(50282)
-        .with_cand_marker_id(50283)
-        .with_noul_query_marker_id(50284)
-        .with_score_query_marker_id(50285)
-        .with_choice_query_marker_id(50286);
+    let cfg = EncodingConfig::default();
 
     let record = JevScenarioRecord {
         id: "test_encode".into(),
@@ -116,8 +109,14 @@ fn test_dataset_encode_with_tokenizer() {
 
     let encoded = record.encode(&tokenizer, &cfg).unwrap();
     assert_eq!(encoded.id, "test_encode");
-    assert_eq!(encoded.token_ids[0], cfg.cls_id);
-    assert_eq!(*encoded.token_ids.last().unwrap(), cfg.eos_id);
+    assert_eq!(encoded.encoded.input_ids[0], cfg.cls_id);
+    assert_eq!(*encoded.encoded.input_ids.last().unwrap(), cfg.sep_id);
+    assert!(!encoded.encoded.context.is_empty());
+    // One item per candidate, noul and rubric of the record.
+    let record_items = record.choice_questions.iter().map(|q| q.candidates.len()).sum::<usize>()
+        + record.noul_queries.len()
+        + record.score_rubrics.len();
+    assert_eq!(encoded.encoded.items.len(), record_items);
     assert_eq!(encoded.targets.choice_targets, vec![0]);
     assert_eq!(encoded.targets.noul_targets, vec![1.0]);
     assert_eq!(encoded.targets.score_targets, vec![3.8]);

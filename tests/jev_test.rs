@@ -1,7 +1,7 @@
-use burn::{module::Param, tensor::Tensor};
+use burn::tensor::Tensor;
 use burn_flex::{Flex, FlexDevice};
 use burn_mamba::{
-    ChoiceVerdict, JevError, NoulVerdict, ScoreVerdict, UnifiedHeads, UnifiedHeadsConfig,
+    ChoiceVerdict, Head, JevError, NoulVerdict, ScoreVerdict, UnifiedHeads, UnifiedHeadsConfig,
     MAX_CHOICE_CANDIDATES,
 };
 
@@ -33,8 +33,8 @@ fn test_noul_verdict_thresholding() {
     );
     assert_eq!(
         verdict.calibrated_temperature,
-        heads.temperature_value(),
-        "Temperature must match heads temperature"
+        heads.temperature_value(Head::Noul),
+        "Temperature must match the noul head temperature"
     );
 
     // Custom strict threshold
@@ -210,33 +210,42 @@ fn test_choice_verdict_candidate_limits() {
 }
 
 #[test]
-fn test_platt_temperature_clamping() {
+fn test_per_head_temperatures() {
     let device = FlexDevice;
     let d_model = 32;
     let config = UnifiedHeadsConfig::new(d_model);
     let mut heads: UnifiedHeads<TestBackend> = config.init(&device);
 
-    // Default initialized temperature is 1.0
-    assert!((heads.temperature_value() - 1.0).abs() < 1e-5);
+    // Every head starts at 1.0 and is frozen (fit post hoc, never trained).
+    for head in Head::ALL {
+        assert!((heads.temperature_value(head) - 1.0).abs() < 1e-5);
+    }
+    assert!(!heads.choice_temperature.is_require_grad());
 
-    // Manually set extreme low temperature (< 0.01)
-    heads.temperature = Param::from_tensor(Tensor::<TestBackend, 1>::from_data([0.0001f32], &device));
-    assert!(
-        (heads.temperature_value() - 0.01).abs() < 1e-5,
-        "Temperature must clamp to 0.01 min, got {}",
-        heads.temperature_value()
-    );
+    // Each head reads its own temperature.
+    heads.set_temperatures(2.0, 0.5, 4.0);
+    assert!((heads.temperature_value(Head::Choice) - 2.0).abs() < 1e-5);
+    assert!((heads.temperature_value(Head::Noul) - 0.5).abs() < 1e-5);
+    assert!((heads.temperature_value(Head::Score) - 4.0).abs() < 1e-5);
 
-    // Manually set extreme high temperature (> 10.0)
-    heads.temperature = Param::from_tensor(Tensor::<TestBackend, 1>::from_data([100.0f32], &device));
-    assert!(
-        (heads.temperature_value() - 10.0).abs() < 1e-5,
-        "Temperature must clamp to 10.0 max, got {}",
-        heads.temperature_value()
-    );
+    let token = Tensor::<TestBackend, 1>::from_floats([0.3; 32], &device).unsqueeze_dim(0);
+    let raw = heads.forward_noul_raw_logits(token.clone()).into_scalar();
+    let scaled = heads.forward_noul_logits(token.clone()).into_scalar();
+    assert!((scaled - raw / 0.5).abs() < 1e-4, "noul logits must use the noul temperature");
+    let raw = heads.forward_score_raw_logits(token.clone()).into_data().to_vec::<f32>().unwrap();
+    let scaled = heads.forward_score_logits(token.clone()).into_data().to_vec::<f32>().unwrap();
+    for (r, s) in raw.iter().zip(&scaled) {
+        assert!((s - r / 4.0).abs() < 1e-4, "score logits must use the score temperature");
+    }
+    let raw = heads.forward_choice_raw_logits(token.clone()).into_scalar();
+    let scaled = heads.forward_choice_logits(token.clone()).into_scalar();
+    assert!((scaled - raw / 2.0).abs() < 1e-4, "choice logits must use the choice temperature");
+    assert_eq!(heads.evaluate_noul_default(token.clone()).unwrap().calibrated_temperature, 0.5);
 
-    // Perform forward pass with clamped temperature: verify numerical stability
-    let token = Tensor::<TestBackend, 1>::zeros([d_model], &device).unsqueeze_dim(0);
+    // Extreme values are clamped to [0.01, 10.0] and stay numerically stable.
+    heads.set_temperatures(0.0001, 100.0, 1.0);
+    assert!((heads.temperature_value(Head::Choice) - 0.01).abs() < 1e-5);
+    assert!((heads.temperature_value(Head::Noul) - 10.0).abs() < 1e-5);
     let noul = heads.evaluate_noul_default(token).unwrap();
     assert!(!noul.probability.is_nan() && !noul.probability.is_infinite());
 }

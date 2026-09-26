@@ -1,80 +1,103 @@
-//! `train_heads` mini-batching. Kept in its own test binary because the backend RNG is
-//! process-global: seeded runs must not interleave with unrelated tests that draw from it.
+//! The native-trainer path end to end on a synthetic task that needs cross-attention: each
+//! context hides a "signal" token; true assertions and correct candidates are noisy copies
+//! of it, distractors are random. Items can only be answered by consulting the context.
 
-use burn::tensor::backend::Backend;
-use burn::tensor::{Distribution, Tensor};
+use burn::backend::Autodiff;
 use burn_flex::{Flex, FlexDevice};
 use burn_mamba::{
-    train_heads, CachedScenario, JointLossBreakdown, MultiQuestionTargets, TrainConfig,
-    UnifiedHeadsConfig,
+    train_decision_model, CachedScenario, DecisionModelConfig, ItemKind, ItemReaderConfig, MultiQuestionTargets,
+    ScenarioFeatures, TrainConfig, UnifiedHeadsConfig,
 };
 
-type DiffBackend = burn::backend::Autodiff<Flex<f32, i32>>;
+type B = Flex<f32, i32>;
+const D: usize = 16;
 
-const TRAIN_D_MODEL: usize = 16;
-
-/// The backend RNG is global, so seeded runs must not interleave with other tests.
-static SEEDED_RNG: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-/// 8 synthetic scenarios (5 benign, 3 adversarial), each with random CLS state and one
-/// 3-candidate choice question.
-fn synthetic_scenarios(device: &FlexDevice) -> Vec<CachedScenario<DiffBackend>> {
-    DiffBackend::seed(device, 7);
-    (0..8)
-        .map(|i| CachedScenario {
-            id: format!("s{i}"),
-            cls_state: Tensor::random([1, TRAIN_D_MODEL], Distribution::Normal(0.0, 1.0), device),
-            choice_questions: vec![Tensor::random([3, TRAIN_D_MODEL], Distribution::Normal(0.0, 1.0), device)],
-            noul_states: None,
-            score_states: None,
-            targets: MultiQuestionTargets {
-                choice_targets: vec![i % 3],
-                noul_targets: vec![],
-                score_targets: vec![],
-            },
-            is_benign: i % 3 != 2,
-        })
-        .collect()
+struct Lcg(u64);
+impl Lcg {
+    fn next(&mut self) -> f32 {
+        self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((self.0 >> 40) as f32 / (1u64 << 24) as f32) * 2.0 - 1.0
+    }
+    fn vec(&mut self, scale: f32) -> Vec<f32> {
+        (0..D).map(|_| self.next() * scale).collect()
+    }
 }
 
-fn run_train_heads(batch_size: usize, seed: u64) -> Vec<JointLossBreakdown> {
-    let _guard = SEEDED_RNG.lock().unwrap_or_else(|e| e.into_inner());
+fn scenario(rng: &mut Lcg, i: usize) -> CachedScenario {
+    let signal = rng.vec(1.5);
+    let near = |rng: &mut Lcg| signal.iter().zip(rng.vec(0.3)).map(|(s, n)| s + n).collect::<Vec<_>>();
+    let ctx_len = 6;
+    let hidden = (rng.next().abs() * ctx_len as f32) as usize % ctx_len;
+    let mut ctx = Vec::new();
+    for t in 0..ctx_len {
+        ctx.extend(if t == hidden { signal.clone() } else { rng.vec(1.5) });
+    }
+
+    let target = (rng.next().abs() * 3.0) as usize % 3;
+    let mut items = Vec::new();
+    let mut kinds = Vec::new();
+    for c in 0..3 {
+        items.extend(if c == target { near(rng) } else { rng.vec(1.5) });
+        kinds.push(ItemKind::Choice { question: 0, candidate: c });
+    }
+    let truth = i % 2 == 0;
+    items.extend(if truth { near(rng) } else { rng.vec(1.5) });
+    kinds.push(ItemKind::Noul { index: 0 });
+    items.extend(if truth { rng.vec(1.5) } else { near(rng) });
+    kinds.push(ItemKind::Noul { index: 1 });
+    items.extend(rng.vec(1.5));
+    kinds.push(ItemKind::Score { index: 0 });
+
+    CachedScenario {
+        id: format!("syn_{i}"),
+        is_benign: i % 3 != 0,
+        targets: MultiQuestionTargets::new()
+            .with_choice_target(target)
+            .with_noul_target(truth as u8 as f32)
+            .with_noul_target(!truth as u8 as f32)
+            .with_score_target(3.0),
+        features: ScenarioFeatures { d_model: D, ctx, ctx_len, items, kinds },
+    }
+}
+
+#[test]
+fn native_trainer_learns_a_cross_attention_task_and_restores_the_best_epoch() {
     let device = FlexDevice;
-    let scenarios = synthetic_scenarios(&device);
-    let heads_config = UnifiedHeadsConfig::new(TRAIN_D_MODEL).with_knn_dim(8);
+    let mut rng = Lcg(7);
+    let train: Vec<_> = (0..1536).map(|i| scenario(&mut rng, i)).collect();
+    let val: Vec<_> = (0..128).map(|i| scenario(&mut rng, 1000 + i)).collect();
+
+    let reader = ItemReaderConfig::new(D).with_d_reader(32).with_n_heads(4).with_dropout(0.0);
+    let model_config = DecisionModelConfig::with_reader(reader, UnifiedHeadsConfig::new(32).with_dropout(0.0));
+    let run_dir = std::env::temp_dir().join(format!("burn_mamba_trainer_test_{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&run_dir);
     let config = TrainConfig {
         epochs: 30,
-        batch_size,
-        seed: Some(seed),
+        lr: 3e-3,
+        batch_size: 32,
+        patience: 6,
+        seed: 1,
+        run_dir: run_dir.clone(),
         ..TrainConfig::default()
     };
-    train_heads(&scenarios, &heads_config, &config, &device, |_, _| {}).history
-}
 
-#[test]
-fn test_train_heads_minibatch_trains_metric_head() {
-    let history = run_train_heads(4, 0);
-    let first = history.first().unwrap().metric_loss;
-    let last = history.last().unwrap().metric_loss;
-    assert!(first > 0.0, "metric loss must be non-zero with mixed batches of 4, got {first}");
-    assert!(last < first, "metric loss should fall during training: first {first}, last {last}");
-}
+    let out = train_decision_model::<Autodiff<B>>(train, val.clone(), &model_config, &config, &device).unwrap();
+    assert!((1..=30).contains(&out.best_epoch));
+    assert!(run_dir.join("checkpoint").join(format!("model-{}.mpk", out.best_epoch)).exists());
 
-#[test]
-fn test_train_heads_batch_size_one_has_zero_metric_loss() {
-    let history = run_train_heads(1, 0);
-    assert!(
-        history.iter().all(|b| b.metric_loss == 0.0),
-        "single-scenario batches have no contrastive peers, so metric loss must be 0"
-    );
-}
-
-#[test]
-fn test_train_heads_is_deterministic_for_a_seed() {
-    let a = run_train_heads(4, 3);
-    let b = run_train_heads(4, 3);
-    let key = |h: &[JointLossBreakdown]| {
-        h.iter().map(|b| (b.total_loss, b.metric_loss, b.choice_loss)).collect::<Vec<_>>()
-    };
-    assert_eq!(key(&a), key(&b));
+    let (mut choice_ok, mut noul_ok, mut noul_n) = (0, 0, 0);
+    for s in &val {
+        let d = out.model.decide(&s.features, &device).unwrap();
+        choice_ok += (d.choices[0].selected_candidate == s.targets.choice_targets[0]) as usize;
+        for (v, &t) in d.nouls.iter().zip(&s.targets.noul_targets) {
+            noul_ok += (v.is_true == (t >= 0.5)) as usize;
+            noul_n += 1;
+        }
+    }
+    let choice_acc = choice_ok as f64 / val.len() as f64;
+    let noul_acc = noul_ok as f64 / noul_n as f64;
+    eprintln!("best epoch {}: val choice {choice_acc:.3}, noul {noul_acc:.3}", out.best_epoch);
+    assert!(choice_acc > 0.8, "choice accuracy {choice_acc} (chance 0.33)");
+    assert!(noul_acc > 0.8, "noul accuracy {noul_acc} (chance 0.5)");
+    let _ = std::fs::remove_dir_all(&run_dir);
 }

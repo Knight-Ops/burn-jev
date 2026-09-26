@@ -19,7 +19,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use tokenizers::Tokenizer;
 
-use crate::delimiters::DelimiterConfig;
+use crate::encoding::{encode_scenario, EncodedScenario, EncodingConfig, EncodingError, ScenarioTexts};
 use crate::training::MultiQuestionTargets;
 
 // =====================================================================
@@ -78,6 +78,7 @@ pub enum JevDatasetError {
     Io(std::io::Error),
     Json { line: usize, source: serde_json::Error },
     Tokenizer(String),
+    Encoding(EncodingError),
     Validation(String),
 }
 
@@ -87,6 +88,7 @@ impl std::fmt::Display for JevDatasetError {
             Self::Io(e) => write!(f, "Dataset I/O error: {e}"),
             Self::Json { line, source } => write!(f, "JSON parse error at line {line}: {source}"),
             Self::Tokenizer(e) => write!(f, "Tokenizer error: {e}"),
+            Self::Encoding(e) => write!(f, "Encoding error: {e}"),
             Self::Validation(e) => write!(f, "Dataset validation error: {e}"),
         }
     }
@@ -99,6 +101,12 @@ impl std::error::Error for JevDatasetError {
             Self::Json { source, .. } => Some(source),
             _ => None,
         }
+    }
+}
+
+impl From<EncodingError> for JevDatasetError {
+    fn from(e: EncodingError) -> Self {
+        Self::Encoding(e)
     }
 }
 
@@ -116,7 +124,7 @@ impl From<std::io::Error> for JevDatasetError {
 #[derive(Clone, Debug)]
 pub struct TokenizedScenario {
     pub id: String,
-    pub token_ids: Vec<i64>,
+    pub encoded: EncodedScenario,
     pub targets: MultiQuestionTargets,
     pub is_benign: bool,
 }
@@ -166,15 +174,15 @@ impl JevScenarioRecord {
         Ok(())
     }
 
-    /// Encodes this scenario into token IDs and extracts multi-question training targets.
+    /// Encodes this scenario and extracts multi-question training targets.
     pub fn encode(
         &self,
         tokenizer: &Tokenizer,
-        cfg: &DelimiterConfig,
+        cfg: &EncodingConfig,
     ) -> Result<TokenizedScenario, JevDatasetError> {
         self.validate()?;
 
-        let token_ids = self.to_request().encode(tokenizer, cfg)?;
+        let encoded = self.to_request().encode(tokenizer, cfg)?;
 
         let mut targets = MultiQuestionTargets::new();
         for q_def in &self.choice_questions {
@@ -189,7 +197,7 @@ impl JevScenarioRecord {
 
         Ok(TokenizedScenario {
             id: self.id.clone(),
-            token_ids,
+            encoded,
             targets,
             is_benign: self.is_benign,
         })
@@ -267,49 +275,20 @@ pub struct ReflexRequest {
 }
 
 impl ReflexRequest {
-    /// Tokenizes the request into the delimited Tier 1 layout:
-    /// `[CLS] context [SEP] (<choice_q> prompt (<cand> text)*)* (<noul_q> text)* (<score_q> text)* [EOS]`.
-    ///
-    /// This is the single definition of the sequence layout, shared by training and inference.
-    pub fn encode(
-        &self,
-        tokenizer: &Tokenizer,
-        cfg: &DelimiterConfig,
-    ) -> Result<Vec<i64>, JevDatasetError> {
-        let mut token_ids: Vec<i64> = Vec::new();
-        let push_text = |token_ids: &mut Vec<i64>, text: &str| -> Result<(), JevDatasetError> {
-            let enc = tokenizer
-                .encode(text, false)
-                .map_err(|e| JevDatasetError::Tokenizer(e.to_string()))?;
-            token_ids.extend(enc.get_ids().iter().map(|&id| id as i64));
-            Ok(())
+    /// Encodes the request into the span layout of [`crate::encoding`]; the single definition
+    /// of the sequence layout, shared by training and inference.
+    pub fn encode(&self, tokenizer: &Tokenizer, cfg: &EncodingConfig) -> Result<EncodedScenario, EncodingError> {
+        let texts = ScenarioTexts {
+            context: &self.context,
+            choice_questions: self
+                .choice_questions
+                .iter()
+                .map(|q| (q.prompt.as_str(), q.candidates.iter().map(String::as_str).collect()))
+                .collect(),
+            noul_queries: self.noul_queries.iter().map(|n| n.assertion.as_str()).collect(),
+            score_rubrics: self.score_rubrics.iter().map(|s| s.prompt.as_str()).collect(),
         };
-
-        token_ids.push(cfg.cls_id);
-        push_text(&mut token_ids, &self.context)?;
-        token_ids.push(cfg.sep_id);
-
-        for q_def in &self.choice_questions {
-            token_ids.push(cfg.choice_query_marker_id);
-            push_text(&mut token_ids, &q_def.prompt)?;
-            for cand in &q_def.candidates {
-                token_ids.push(cfg.cand_marker_id);
-                push_text(&mut token_ids, cand)?;
-            }
-        }
-
-        for noul_def in &self.noul_queries {
-            token_ids.push(cfg.noul_query_marker_id);
-            push_text(&mut token_ids, &noul_def.assertion)?;
-        }
-
-        for score_def in &self.score_rubrics {
-            token_ids.push(cfg.score_query_marker_id);
-            push_text(&mut token_ids, &score_def.prompt)?;
-        }
-
-        token_ids.push(cfg.eos_id);
-        Ok(token_ids)
+        encode_scenario(&texts, tokenizer, cfg)
     }
 }
 

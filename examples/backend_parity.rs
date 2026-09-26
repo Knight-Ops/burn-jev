@@ -1,15 +1,16 @@
-//! Per-layer CPU vs wgpu parity check for the backbone.
+//! Per-layer CPU vs wgpu parity check for the ModernBERT encoder.
 //!
-//! Each wgpu layer is fed the CPU layer's input, so the reported error is that layer's own
-//! kernel error rather than noise amplified through the stack.
+//! Runs the same encoded scenario through both backends and reports each hidden state's
+//! divergence (embedding, every layer, final norm). Errors compound through the stack, so
+//! the first layer whose error jumps is where to look.
 //!
-//! `cargo run --release --features wgpu --example backend_parity -- <backbone> <tokenizer> <jsonl>`
+//! `cargo run --release --features wgpu --example backend_parity -- <encoder_dir> <jsonl>`
 
-use burn::tensor::{Int, Tensor, TensorData};
+use burn::tensor::{Bool, Int, Tensor, TensorData};
 use tokenizers::Tokenizer;
 
 use burn_mamba::backend::{CpuBackend, FlexDevice, GpuWgpu, WgpuDevice};
-use burn_mamba::{DelimiterConfig, JevDataset, Mamba2CheckpointLoader};
+use burn_mamba::{EncodingConfig, JevDataset, ModernBertLoader};
 
 fn to_vec<B: burn::tensor::backend::Backend>(t: Tensor<B, 3>) -> Vec<f32> {
     t.into_data().convert::<f32>().to_vec().unwrap()
@@ -17,28 +18,39 @@ fn to_vec<B: burn::tensor::backend::Backend>(t: Tensor<B, 3>) -> Vec<f32> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
-    let [_, backbone, tokenizer, data] = args.as_slice() else {
-        return Err("usage: backend_parity <backbone> <tokenizer> <jsonl>".into());
+    let [_, encoder_dir, data] = args.as_slice() else {
+        return Err("usage: backend_parity <encoder_dir> <jsonl>".into());
     };
-    let tokenizer = Tokenizer::from_file(tokenizer).map_err(|e| e.to_string())?;
-    let ds = JevDataset::from_jsonl_file(data)?;
-    let tokens = ds.records[0].encode(&tokenizer, &DelimiterConfig::mamba2_reserved())?.token_ids;
-    eprintln!("[parity] {} tokens", tokens.len());
-
     let (cpu_dev, gpu_dev) = (FlexDevice, WgpuDevice::default());
-    let cpu = Mamba2CheckpointLoader::load_backbone_file::<CpuBackend, _>(backbone, &cpu_dev)?.model;
-    let gpu = Mamba2CheckpointLoader::load_backbone_file::<GpuWgpu, _>(backbone, &gpu_dev)?.model;
+    let cpu = ModernBertLoader::load_dir::<CpuBackend, _>(encoder_dir, &cpu_dev)?;
+    let gpu = ModernBertLoader::load_dir::<GpuWgpu, _>(encoder_dir, &gpu_dev)?.model;
+    let tokenizer_path = cpu.tokenizer_path.clone().ok_or("encoder dir has no tokenizer.json")?;
+    let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(|e| e.to_string())?;
 
-    let ids = TensorData::new(tokens.clone(), [1, tokens.len()]);
-    let mut x_cpu = cpu.embedding.forward(Tensor::<CpuBackend, 2, Int>::from_data(ids.clone(), &cpu_dev));
-    let x_gpu = gpu.embedding.forward(Tensor::<GpuWgpu, 2, Int>::from_data(ids, &gpu_dev));
-    report("embedding", &to_vec(x_cpu.clone()), &to_vec(x_gpu));
+    let ds = JevDataset::from_jsonl_file(data)?;
+    let encoding = EncodingConfig::for_encoder(&cpu.config);
+    let tokens = ds.records[0].encode(&tokenizer, &encoding)?.encoded.input_ids;
+    let l = tokens.len();
+    eprintln!("[parity] {l} tokens");
 
-    for (i, (lc, lg)) in cpu.layers.iter().zip(&gpu.layers).enumerate() {
-        let input = Tensor::<GpuWgpu, 3>::from_data(x_cpu.to_data(), &gpu_dev);
-        let y_gpu = lg.forward(input);
-        x_cpu = lc.forward(x_cpu);
-        report(&format!("layer {i:>2}"), &to_vec(x_cpu.clone()), &to_vec(y_gpu));
+    let ids = TensorData::new(tokens, [1, l]);
+    let mask = TensorData::new(vec![true; l], [1, l]);
+    let hc = cpu.model.forward_hidden_states(
+        Tensor::<CpuBackend, 2, Int>::from_data(ids.clone(), &cpu_dev),
+        Tensor::<CpuBackend, 2, Bool>::from_data(mask.clone(), &cpu_dev),
+    );
+    let hg = gpu.forward_hidden_states(
+        Tensor::<GpuWgpu, 2, Int>::from_data(ids, &gpu_dev),
+        Tensor::<GpuWgpu, 2, Bool>::from_data(mask, &gpu_dev),
+    );
+    let n = hc.len();
+    for (i, (c, g)) in hc.into_iter().zip(hg).enumerate() {
+        let name = match i {
+            0 => "embedding".to_string(),
+            i if i == n - 1 => "final norm".to_string(),
+            i => format!("layer {:>2}", i - 1),
+        };
+        report(&name, &to_vec(c), &to_vec(g));
     }
     Ok(())
 }

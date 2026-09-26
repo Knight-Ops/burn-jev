@@ -44,14 +44,17 @@ impl BackendKind {
         .into()
     }
 
-    /// Feature-cache key for this backend. CPU keeps the bare backbone sha so existing caches
-    /// stay valid; GPU features differ numerically (the backbone amplifies float noise) and
-    /// must not share a cache with CPU ones.
-    pub fn cache_model_id(self, backbone_sha: &str) -> String {
-        match self {
-            BackendKind::Cpu => backbone_sha.to_string(),
-            other => format!("{backbone_sha}-{}", other.name()),
-        }
+    /// Feature-cache key: everything that changes the cached features. GPU features differ
+    /// numerically from CPU ones (the encoder amplifies float noise), so each backend gets
+    /// its own cache.
+    pub fn cache_key(self, encoder_sha: &str, tokenizer_sha: &str, max_seq_len: usize) -> String {
+        format!(
+            "{}-tok{}-enc{}-len{max_seq_len}-{}",
+            &encoder_sha[..encoder_sha.len().min(16)],
+            &tokenizer_sha[..tokenizer_sha.len().min(12)],
+            crate::encoding::ENCODING_VERSION,
+            self.name()
+        )
     }
 }
 

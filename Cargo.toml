@@ -1,11 +1,11 @@
 [package]
-name = "burn-mamba"
+name = "burn-jev"
 version = "0.1.0"
 edition = "2024"
 default-run = "reflex"
 
 [dependencies]
-burn = { version = "0.21.0", features = ["train"] }
+burn = { version = "0.21.0", features = ["train", "tui"] }
 burn-flex = "0.21.0"
 half = { version = "2.7.1", features = ["bytemuck"] }
 bytemuck = "1"

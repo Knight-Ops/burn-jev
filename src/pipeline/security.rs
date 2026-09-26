@@ -3,6 +3,7 @@ use std::sync::Arc;
 use burn::tensor::backend::Backend;
 
 use crate::anomaly::{AnomalyVerdict, TenantRegistry};
+use crate::dataset::ReflexRequest;
 use crate::pipeline::engine::{ReflexEngine, ReflexError, ReflexVerdict};
 
 /// Default threat threshold on calibrated Noul probability (P_threat > 0.85)
@@ -32,7 +33,8 @@ pub enum Tier1Routing {
         reason: EscalationReason,
         verdict: ReflexVerdict,
         anomaly_verdict: Option<AnomalyVerdict>,
-        raw_prompt_tokens: Vec<i64>,
+        /// The original request, handed to the Tier 2 audit.
+        request: ReflexRequest,
     },
 }
 
@@ -85,15 +87,15 @@ impl<B: Backend> ReflexSecurityRouter<B> {
         self
     }
 
-    /// Evaluates the sequence and executes the complete Tier 1 reflex gating logic.
+    /// Evaluates the request and executes the complete Tier 1 reflex gating logic.
     pub fn route(
         &self,
         tenant_id: &str,
-        tokens: &[i64],
+        request: &ReflexRequest,
         device: &B::Device,
     ) -> Result<Tier1Routing, ReflexError> {
-        // Step 1: Run the fast reflex pass through the Bi-Mamba-2 backbone and Jev heads
-        let verdict = self.engine.evaluate(tokens, device)?;
+        // Step 1: Run the fast reflex pass through the encoder and decision model
+        let verdict = self.engine.evaluate(request, device)?;
 
         // Step 2: Query tenant vector index for outlier anomaly distance
         let anomaly_verdict = self.registry.evaluate(tenant_id, &verdict.embedding)?;
@@ -112,7 +114,7 @@ impl<B: Backend> ReflexSecurityRouter<B> {
                 },
                 verdict,
                 anomaly_verdict: Some(anomaly_verdict),
-                raw_prompt_tokens: tokens.to_vec(),
+                request: request.clone(),
             })
         } else if is_anomaly {
             Ok(Tier1Routing::EscalateToTier2 {
@@ -122,7 +124,7 @@ impl<B: Backend> ReflexSecurityRouter<B> {
                 },
                 verdict,
                 anomaly_verdict: Some(anomaly_verdict),
-                raw_prompt_tokens: tokens.to_vec(),
+                request: request.clone(),
             })
         } else if is_high_threat {
             Ok(Tier1Routing::EscalateToTier2 {
@@ -132,7 +134,7 @@ impl<B: Backend> ReflexSecurityRouter<B> {
                 },
                 verdict,
                 anomaly_verdict: Some(anomaly_verdict),
-                raw_prompt_tokens: tokens.to_vec(),
+                request: request.clone(),
             })
         } else {
             // Clean traffic: pass directly to target LLM with zero overhead

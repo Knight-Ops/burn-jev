@@ -1,0 +1,15 @@
+Improvements, in the order I'd try them
+
+1. Regularize and average checkpoints (cheap, uses cached features).
+   - Raise dropout to 0.2–0.3 and weight decay to 0.05, try a reader width of 128, and randomly drop some context tokens during training.
+   - Average the weights of the last few good epochs, or ensemble the 3 seeds (1.4M parameters each, trivial at inference).
+   - Both attack the overfitting and the noisy epoch pick directly.
+2. Give each head its own temperature (small code change). Right now choice, noul and score share one temperature, while choice is very confident and noul isn't. Separate temperatures would help calibration and may reduce the score compression.
+3. Improve reading for noul, where the evidence points.
+   - ModernBERT-large: already supported; it only needs a one-time feature re-extraction of about 10 minutes, then same-speed training. This is the most likely gain on the negation and timing questions.
+   - Unfreeze the top 2–4 encoder layers: cache features from below them and fine-tune the rest. That's the option you deferred in planning.
+   - Encode each assertion with the context on its own: instead of all items in one sequence. Training cost is unchanged because features are cached, but inference cost grows with the number of questions.
+4. Audit the data.
+   - Hand-check the 54 always-wrong noul questions for label problems; some look ambiguous.
+   - Add hand-written or held-out-cluster validation data, since the generated validation set may overstate how well this transfers.
+   - The malware cluster is still missing from validation.
