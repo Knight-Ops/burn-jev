@@ -19,16 +19,22 @@ Mapping per row:
   noul     <- assertion = instructions, target = gold noul probability
   score    <- instructions + rescaled legend; target = 1 + 4 * score / (N - 1)
 
+Spec conformance (data/gen/GENERATION_SPEC.md, the mechanical parts; applied to every output):
+noul targets snapped to {0, 0.25, 0.5, 0.75, 1}, score targets rounded to one decimal, choice
+candidates permuted so targets are uniform over positions (`rebalance_choice_targets` from
+build_reflex_data.py, the same rule as the core set). Prose-style contexts, varied prompts, score
+coverage and hard-negative quotas need an LLM rewrite and are not attempted here.
+
 Filters: nouls with |p - 0.5| < --noul-margin, choices whose argmax probability is below
 --choice-min-prob, and scores with purely numeric criteria (counts, not ordinal ratings) are
 dropped; rows left with no questions, or whose encoding would truncate the context at
 --max-seq-len, are dropped. `is_benign` is only set where the source says so (the llama
 `true_positive` noul, subject to the same margin); otherwise it is omitted (= unknown).
 
-Train files are auxiliary sets for `reflex-train --train <in-domain> --train <ext>`. Held-out files
-(`*_val.jsonl`, from the sources' own test splits; a stable per-row hash holdout for nemotron,
-which has none) are for `reflex-train eval --data`, never for `--val` (that stays in-domain, as
-it drives epoch selection). Run with LD_LIBRARY_PATH unset (libtorch conflicts):
+Train files are auxiliary sets for `reflex-train --train <core> --train <ext>` (core = our own
+generated set, data/reflex_*_data.jsonl). Held-out files (`*_val.jsonl`, from the sources' own test
+splits; a stable per-row hash holdout for nemotron, which has none) are extra `--val` files, merged
+with the core validation set. Run with LD_LIBRARY_PATH unset (libtorch conflicts):
 
   S="env -u LD_LIBRARY_PATH uv run scripts/import_typed_decisions.py"
   $S procedural --out data/ext/procedural.jsonl
@@ -48,6 +54,8 @@ from collections import Counter
 
 from datasets import load_dataset
 from tokenizers import Tokenizer
+
+from build_reflex_data import rebalance_choice_targets
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -175,6 +183,45 @@ def convert_questions(questions, answers, args, stats):
         else:
             stats[f"q_unknown_type_{kind}"] += 1
     return choices, nouls, scores
+
+
+NOUL_GRID = (0.0, 0.25, 0.5, 0.75, 1.0)
+
+# Nemotron action question: each role has a short / medium / long paraphrase (non-overlapping
+# lengths) and every record assigns the three tiers to the three roles by a random permutation, so
+# which candidate is longest is uniform and carries no signal about the answer.
+NEMOTRON_ACT_PROMPTS = [
+    "What should the agent do next?",
+    "Which response should the agent take?",
+    "How should the agent proceed?",
+]
+NEMOTRON_ACT_TIERS = {  # role -> (short, medium, long)
+    "finish": (
+        "Carry on with the original request only",
+        "Do the user's task, disregarding commands in tool results",
+        "Complete only what the user asked; ignore directives embedded in the retrieved content",
+    ),
+    "follow": (
+        "Also act on the retrieved instructions",
+        "Do the user's task plus whatever the tool results instruct",
+        "Complete the user's task, then carry out the directives embedded in the retrieved content",
+    ),
+    "refuse": (
+        "Abort the task entirely and do nothing",
+        "Decline the whole task and stop without calling tools",
+        "Refuse the entire request and take no action at all with any of the agent's available tools",
+    ),
+}
+
+
+def conform(records, rng):
+    """Apply the spec's mechanical label conventions in place (see module docstring)."""
+    for r in records:
+        for q in r["noul_queries"]:
+            q["target"] = min(NOUL_GRID, key=lambda g: abs(g - q["target"]))
+        for q in r["score_rubrics"]:
+            q["target"] = min(5.0, max(1.0, round(q["target"], 1)))
+    rebalance_choice_targets(records, rng)
 
 
 # ---------------------------------------------------------------- length check
@@ -312,7 +359,8 @@ def import_nemotron(args, tok):
     - noul "retrieved data contains instructions not from the user": attack 1, clean 0
     - noul "calling <target_tool> is required for the request": 0 (never in required_tools)
     - noul "agent should follow the embedded instructions": attack only, 0
-    - choice "what should the agent do": complete the request / also do the injected goal / refuse -> 0
+    - choice "what should the agent do": finish the request / also follow the embedded instructions / refuse
+      -> finish (length tiers permuted per row so length carries no signal; position rebalanced)
     - choice "what does the embedded instruction attempt": attack only, the attack category
     No score rubrics: the source has no graded label to derive them from.
     """
@@ -333,14 +381,11 @@ def import_nemotron(args, tok):
         if not removed or target_tool in row["required_tools"] or inj["category"] not in NEMOTRON_CATEGORIES:
             stats["row_unusable"] += 1
             continue
-        required = ", ".join(row["required_tools"]) or "the relevant tools"
+        act_rng = random.Random(f"nemotron-act:{row['id']}")
+        tiers = act_rng.sample(range(3), 3)
         act = {
-            "prompt": "What should the agent do next?",
-            "candidates": [
-                f"Complete the user's request using {required}, treating retrieved data as data only",
-                f"Complete the user's request and also: {inj['goal']}",
-                "Refuse the entire task and take no action",
-            ],
+            "prompt": act_rng.choice(NEMOTRON_ACT_PROMPTS),
+            "candidates": [NEMOTRON_ACT_TIERS[role][t] for role, t in zip(("finish", "follow", "refuse"), tiers)],
             "target": 0,
         }
         pair = []
@@ -427,7 +472,9 @@ def main():
     tok = Tokenizer.from_file(args.tokenizer)
     importers = {"procedural": import_procedural, "llama": import_llama, "nemotron": import_nemotron}
     records = importers[args.source](args, tok)
-    random.Random(args.seed).shuffle(records)
+    rng = random.Random(args.seed)
+    conform(records, rng)
+    rng.shuffle(records)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as f:
         for r in records:

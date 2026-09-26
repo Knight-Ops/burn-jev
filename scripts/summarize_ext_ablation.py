@@ -4,8 +4,8 @@
   scripts/summarize_ext_ablation.py [--logs data/.runs/ext-ablation] [--out docs/ext_data_ablation.md]
 
 Stdlib only. Parses the "=== Summary" block and the per-scenario lines of `reflex-train` output.
-The validation set is merged (in-domain + external held-out sets), so the headline summary mixes
-sources; the per-source tables (from per-scenario lines) separate in-domain from each ext set.
+The validation set is merged (core + external held-out sets), so the headline summary mixes
+sources; the per-source tables (from per-scenario lines) separate the core set (our generated data) from each ext set.
 """
 import argparse
 import glob
@@ -41,9 +41,9 @@ METRICS = [
 
 
 def source_of(domain):
-    """in_domain, or the external set a domain came from (ext_procedural, ext_nemotron_ipi, ...)."""
+    """core (our generated set), or the external set a domain came from (ext_procedural, ext_nemotron_ipi, ...)."""
     if not domain.startswith("ext_"):
-        return "in_domain"
+        return "core"
     for prefix in ("ext_procedural", "ext_nemotron_ipi"):
         if domain.startswith(prefix):
             return prefix
@@ -155,10 +155,10 @@ def main():
                 cells.append(f"{d:+.3f}" if key == "score_rmse" else f"{d:+.1f}")
             out.append(f"| {c} | " + " | ".join(cells) + " |")
 
-    domains = sorted({d for c in configs for s in runs[c].values() for d in s[1] if source_of(d) == "in_domain"})
+    domains = sorted({d for c in configs for s in runs[c].values() for d in s[1] if source_of(d) == "core"})
     for key, label, _ in METRICS[:3]:
         out.append("")
-        out.append(f"Per in-domain domain {label} (mean over seeds):")
+        out.append(f"Per core domain {label} (mean over seeds):")
         out.append("")
         out.append("| Domain | " + " | ".join(configs) + " |")
         out.append("|---" * (len(configs) + 1) + "|")
@@ -169,8 +169,8 @@ def main():
                 cells.append("n/a" if m is None else (f"{m:.3f}" if key == "score_rmse" else f"{m:.1f}"))
             out.append(f"| {d} | " + " | ".join(cells) + " |")
 
-    # Per source: in-domain first, then each external held-out set.
-    sources = sorted({src for c in configs for r in runs[c].values() for src in r[2]}, key=lambda x: (x != "in_domain", x))
+    # Per source: core first, then each external held-out set.
+    sources = sorted({src for c in configs for r in runs[c].values() for src in r[2]}, key=lambda x: (x != "core", x))
     for src in sources:
         out.append("")
         out.append(f"Source `{src}` (mean ± std over seeds):")

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Ablation: does adding imported typed-decisions data (data/ext/) help the Tier 1 model?
-# Every config trains on the in-domain set plus zero or more auxiliary files and validates on the
-# same merged set for all configs: in-domain val + the external held-out sets (EXT_VAL, passed as
+# Every config trains on the core set (our generated data) plus zero or more auxiliary files and validates on the
+# same merged set for all configs: core val + the external held-out sets (EXT_VAL, passed as
 # extra --val). Repeated over several seeds (val metrics are seed-noisy). Summarize with
-# scripts/summarize_ext_ablation.py, which splits metrics per source (in-domain vs each ext set).
+# scripts/summarize_ext_ablation.py, which splits metrics per source (core vs each ext set).
 #
 #   scripts/run_ext_ablation.sh [config ...]     # default: all configs
 #   ENCODER=models/modernbert-large SEEDS="42 1 2 3" scripts/run_ext_ablation.sh baseline
