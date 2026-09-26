@@ -14,7 +14,7 @@ use burn::{
         Dropout, DropoutConfig, Embedding, EmbeddingConfig, LayerNorm, LayerNormConfig, Linear,
         LinearConfig,
     },
-    tensor::{activation::gelu, backend::Backend, Bool, Distribution, Int, Tensor},
+    tensor::{activation::gelu, backend::Backend, Bool, Int, Tensor},
 };
 
 use crate::encoding::NUM_ITEM_TYPES;
@@ -33,9 +33,6 @@ pub struct ItemReaderConfig {
     pub ffn_mult: usize,
     #[config(default = "0.1")]
     pub dropout: f64,
-    /// Probability of hiding each real context token from the reader's keys (training only).
-    #[config(default = "0.0")]
-    pub ctx_token_drop: f64,
 }
 
 #[derive(Module, Debug)]
@@ -71,8 +68,6 @@ pub struct ItemReader<B: Backend> {
     pub blocks: Vec<ReaderBlock<B>>,
     pub out_norm: LayerNorm<B>,
     pub dropout: Dropout,
-    #[module(skip)]
-    pub ctx_token_drop: f64,
 }
 
 impl ItemReaderConfig {
@@ -98,7 +93,6 @@ impl ItemReaderConfig {
             blocks,
             out_norm: norm(),
             dropout: DropoutConfig::new(self.dropout).init(),
-            ctx_token_drop: self.ctx_token_drop,
         }
     }
 }
@@ -115,26 +109,12 @@ impl<B: Backend> ItemReader<B> {
     ) -> Tensor<B, 3> {
         let mut q = self.dropout.forward(self.proj.forward(queries) + self.type_emb.forward(types));
         if !self.blocks.is_empty() {
-            let ctx_pad = self.drop_context_tokens(ctx_pad);
             let kv = self.proj.forward(ctx);
             for block in &self.blocks {
                 q = block.forward(q, kv.clone(), ctx_pad.clone());
             }
         }
         self.out_norm.forward(q)
-    }
-
-    /// Masks a random `ctx_token_drop` fraction of context tokens, only when autodiff is on
-    /// (the same gate as [`Dropout`]), so validation and inference see every token. A row
-    /// with every token masked is harmless: MHA's finite mask value yields uniform attention.
-    fn drop_context_tokens(&self, ctx_pad: Tensor<B, 2, Bool>) -> Tensor<B, 2, Bool> {
-        let device = ctx_pad.device();
-        if self.ctx_token_drop <= 0.0 || !B::ad_enabled(&device) {
-            return ctx_pad;
-        }
-        let drop = Tensor::<B, 2>::random(ctx_pad.dims(), Distribution::Bernoulli(self.ctx_token_drop), &device)
-            .greater_elem(0.5);
-        ctx_pad.bool_or(drop)
     }
 
     /// Scenario-level embedding for the k-NN head: the masked mean of the context tokens,

@@ -9,7 +9,7 @@ use safetensors::tensor::{Dtype, TensorView};
 
 // Safetensors payloads are little-endian; decoding reinterprets bytes in native order.
 #[cfg(target_endian = "big")]
-compile_error!("burn-mamba's safetensors loader assumes a little-endian target");
+compile_error!("burn-jev's safetensors loader assumes a little-endian target");
 
 #[derive(Debug)]
 pub enum LoadError {

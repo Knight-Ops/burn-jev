@@ -3,14 +3,14 @@ mod common;
 use std::path::PathBuf;
 
 use burn_flex::FlexDevice;
-use burn_mamba::{
+use burn_jev::{
     load_artifact, read_artifact_metadata, save_artifact, ArtifactMetadata, DecisionModelConfig, Head, ItemKind,
     ItemReaderConfig, LoadError, ScenarioFeatures, UnifiedHeadsConfig,
 };
 use common::{tiny_encoding, TestBackend};
 
 fn temp_path(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("burn_mamba_artifact_{}_{name}.safetensors", std::process::id()))
+    std::env::temp_dir().join(format!("burn_jev_artifact_{}_{name}.safetensors", std::process::id()))
 }
 
 fn config() -> DecisionModelConfig {

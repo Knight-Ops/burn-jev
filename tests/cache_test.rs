@@ -1,4 +1,4 @@
-use burn_mamba::{CachedScenario, FeatureCache, ItemKind, MultiQuestionTargets, ScenarioFeatures};
+use burn_jev::{CachedScenario, FeatureCache, ItemKind, MultiQuestionTargets, ScenarioFeatures};
 
 fn scenario(id: &str, ctx_len: usize, kinds: Vec<ItemKind>, d: usize) -> CachedScenario {
     let n = kinds.len();
@@ -19,7 +19,7 @@ fn scenario(id: &str, ctx_len: usize, kinds: Vec<ItemKind>, d: usize) -> CachedS
 #[test]
 fn test_feature_cache_roundtrip() {
     let d = 8;
-    let dir = std::env::temp_dir().join(format!("burn_mamba_cache_test_{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("burn_jev_cache_test_{}", std::process::id()));
     let (st_path, meta_path) = FeatureCache::cache_paths(&dir, std::path::Path::new("train.jsonl"), "enc/abc:1");
     let scenarios = vec![
         scenario(

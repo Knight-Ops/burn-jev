@@ -9,8 +9,8 @@
 use burn::tensor::{Bool, Int, Tensor, TensorData};
 use tokenizers::Tokenizer;
 
-use burn_mamba::backend::{CpuBackend, FlexDevice, GpuWgpu, WgpuDevice};
-use burn_mamba::{EncodingConfig, JevDataset, ModernBertLoader};
+use burn_jev::backend::{CpuBackend, FlexDevice, GpuWgpu, WgpuDevice};
+use burn_jev::{EncodingConfig, JevDataset, ModernBertLoader};
 
 fn to_vec<B: burn::tensor::backend::Backend>(t: Tensor<B, 3>) -> Vec<f32> {
     t.into_data().convert::<f32>().to_vec().unwrap()

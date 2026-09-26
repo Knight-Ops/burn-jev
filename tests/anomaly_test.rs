@@ -2,7 +2,7 @@ use std::sync::Arc;
 use burn::tensor::Tensor;
 use burn_flex::{Flex, FlexDevice};
 
-use burn_mamba::anomaly::{
+use burn_jev::anomaly::{
     calibrate_threshold_from_distances, AnomalyEmbedding, AnomalyError, FifoRingBuffer,
     InMemoryRingIndex, TenantConfig, TenantRegistry, KNN_EMBEDDING_DIM,
 };

@@ -23,6 +23,7 @@ default = ["wgpu", "fusion"]
 wgpu = ["burn/wgpu"]
 # Kernel fusion for the GPU backends.
 fusion = ["burn/fusion"]
+cuda = ["burn/cuda"]
 
 # Optimize dependencies (burn-flex kernels, gemm, half) even in debug builds;
 # unoptimized tensor kernels dominate runtime otherwise.

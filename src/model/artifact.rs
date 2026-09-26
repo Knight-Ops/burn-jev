@@ -21,7 +21,7 @@ use crate::model::decision::{DecisionModel, DecisionModelConfig};
 use crate::model::weights::{write_safetensors, LoadError};
 
 const FORMAT_KEY: &str = "format";
-const FORMAT: &str = "burn-mamba/reflex-decision";
+const FORMAT: &str = "burn-jev/reflex-decision";
 const METADATA_KEY: &str = "reflex_decision";
 const RECORD_TENSOR: &str = "record";
 /// Bumped whenever the artifact layout or metadata schema changes incompatibly.

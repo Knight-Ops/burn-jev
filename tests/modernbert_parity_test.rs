@@ -9,7 +9,7 @@ use std::path::Path;
 
 use burn::tensor::{Bool, Int, Tensor, TensorData};
 use burn_flex::{Flex, FlexDevice};
-use burn_mamba::model::ModernBertLoader;
+use burn_jev::model::ModernBertLoader;
 use safetensors::SafeTensors;
 
 type B = Flex<f32, i32>;

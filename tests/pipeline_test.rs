@@ -3,7 +3,7 @@ mod common;
 use std::sync::Arc;
 
 use burn_flex::FlexDevice;
-use burn_mamba::{
+use burn_jev::{
     AnomalyEmbedding, ChoiceQuestionRequest, DecisionModelConfig, EscalationReason, InMemoryRingIndex,
     NoulQueryRequest, ReflexEngine, ReflexRequest, ReflexSecurityRouter, ScoreRubricRequest, TenantConfig,
     TenantRegistry, Tier1Routing, KNN_EMBEDDING_DIM,

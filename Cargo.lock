@@ -842,7 +842,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "burn-mamba"
+name = "burn-jev"
 version = "0.1.0"
 dependencies = [
  "burn",

@@ -2,8 +2,8 @@
 //! and writes a decision artifact.
 //!
 //! ```text
-//! reflex-train [--backend cpu|wgpu] --encoder <dir> --train <jsonl> --val <jsonl> --out <st> [options]
-//! reflex-train eval [--backend cpu|wgpu] --encoder <dir> --artifact <st> --data <jsonl> [--baseline-from <jsonl>]
+//! reflex-train [--backend cpu|wgpu|cuda] --encoder <dir> --train <jsonl> --val <jsonl> --out <st> [options]
+//! reflex-train eval [--backend cpu|wgpu|cuda] --encoder <dir> --artifact <st> --data <jsonl> [--baseline-from <jsonl>]
 //! ```
 //!
 //! Training runs on Burn's supervised trainer (TUI when attached to a terminal); logs,
@@ -18,12 +18,12 @@ use burn::tensor::backend::Backend;
 use clap::{Args, Parser, Subcommand};
 use tokenizers::Tokenizer;
 
-use burn_mamba::backend::{BackendKind, CpuBackend, FlexDevice};
-use burn_mamba::training::{
+use burn_jev::backend::{BackendKind, CpuBackend, FlexDevice};
+use burn_jev::training::{
     evaluate_dataset, get_or_compute_features, train_decision_model, CacheOutcome, CacheSettings,
     FeatureContext, TrainConfig,
 };
-use burn_mamba::{
+use burn_jev::{
     load_artifact, save_artifact, sha256_file, ArtifactMetadata, Baselines, CachedScenario,
     DecisionModelConfig, EncodingConfig, EvalReport, ItemReaderConfig, JevDataset, LoadedEncoder,
     ModernBertLoader, ReflexEngine, UnifiedHeadsConfig,
@@ -102,9 +102,6 @@ struct TrainArgs {
     /// Dropout in the reader and heads.
     #[arg(long, default_value_t = 0.25)]
     dropout: f64,
-    /// Fraction of context tokens hidden from the reader per training step.
-    #[arg(long, default_value_t = 0.1)]
-    ctx_token_drop: f64,
     /// Directory for the persistent encoder feature cache.
     #[arg(long, default_value = "data/.cache")]
     cache_dir: PathBuf,
@@ -140,7 +137,9 @@ fn main() -> ExitCode {
     let result = match backend {
         BackendKind::Cpu => dispatch::<CpuBackend>(cli, FlexDevice),
         #[cfg(feature = "wgpu")]
-        BackendKind::Wgpu => dispatch::<burn_mamba::backend::GpuWgpu>(cli, burn_mamba::backend::WgpuDevice::default()),
+        BackendKind::Wgpu => dispatch::<burn_jev::backend::GpuWgpu>(cli, burn_jev::backend::WgpuDevice::default()),
+        #[cfg(feature = "cuda")]
+        BackendKind::Cuda => dispatch::<burn_jev::backend::GpuCuda>(cli, burn_jev::backend::CudaDevice::default()),
         #[allow(unreachable_patterns)]
         other => Err(other.not_compiled()),
     };
@@ -263,8 +262,7 @@ fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
         .with_d_reader(args.reader_dim)
         .with_n_blocks(args.reader_blocks)
         .with_n_heads(args.reader_heads)
-        .with_dropout(args.dropout)
-        .with_ctx_token_drop(args.ctx_token_drop);
+        .with_dropout(args.dropout);
     let model_config = DecisionModelConfig::with_reader(reader, UnifiedHeadsConfig::new(args.reader_dim).with_dropout(args.dropout));
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let train_config = TrainConfig {
@@ -278,7 +276,7 @@ fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
         ..TrainConfig::default()
     };
     eprintln!(
-        "\n[train] AdamW lr={} wd={} epochs<={} batch={} patience={} seed={} reader={}x{} blocks, {} heads, ctx-token-drop={}; run dir {}",
+        "\n[train] AdamW lr={} wd={} epochs<={} batch={} patience={} seed={} reader={}x{} blocks, {} heads; run dir {}",
         train_config.lr,
         train_config.weight_decay,
         train_config.epochs,
@@ -288,7 +286,6 @@ fn run_train<B: Backend>(args: TrainArgs, device: B::Device) -> AppResult<()> {
         args.reader_dim,
         args.reader_blocks,
         args.reader_heads,
-        args.ctx_token_drop,
         train_config.run_dir.display()
     );
     let start = Instant::now();

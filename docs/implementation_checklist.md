@@ -1,6 +1,6 @@
 # Tier 1 Reflex Engine: Implementation Checklist & Roadmap
 
-This document serves as the master implementation checklist, architecture tracking ledger, and progress scorecard for the **Tier 1 Reflex Engine** (`burn-mamba`).
+This document serves as the master implementation checklist, architecture tracking ledger, and progress scorecard for the **Tier 1 Reflex Engine** (`burn-jev`).
 
 ---
 
@@ -74,6 +74,7 @@ Empower the Tier 1 Reflex Engine to parse and evaluate multiple categorical choi
   - [x] Updated `examples/seeded_jev_inference.rs` to demonstrate multi-choice, multi-noul, and multi-score real BPE inference in a single forward pass.
 
 ## Phase 10: Training & Inference Applications
+
 - [x] **10.1 Library-Owned Training Logic**
   - [x] `training::features`: `compute_features_from_backbone` / `get_or_compute_features` (frozen-backbone features, `FeatureCache` keyed by backbone SHA-256).
   - [x] `training::trainer`: `train_heads(scenarios, heads_config, TrainConfig, ..)` with per-epoch `JointLossBreakdown`s; weights in `JointLossConfig::frozen_backbone()`; optional seed.
@@ -89,7 +90,9 @@ Empower the Tier 1 Reflex Engine to parse and evaluate multiple categorical choi
   - [x] Removed the toy `src/main.rs` and the fallback-heavy examples; `examples/generate_demo_backbone.rs` writes a synthetic demo backbone.
 
 ## Phase 11: ModernBERT Encoder + Item Cross-Attention Reader
+
 The Mamba-2 backbone, SSD scans, marker-delimiter coordinates and the Mamba checkpoint loader have been removed. The old code survives only in the initial commit.
+
 - [x] **11.1 Encoder** (`src/model/modernbert/`)
   - [x] `ModernBertConfig::from_hf_json` reads the config, and `ModernBertLoader::load_dir` loads the weights strictly: every tensor must be present, and only the MLM head may be left unused. Both base and large work.
   - [x] Parity with HF transformers 5.x, measured per layer on short, long (past the local window) and padded cases (`scripts/modernbert_reference.py`, `tests/modernbert_parity_test.rs`). The worst token cosine is 0.99999992.
@@ -100,6 +103,5 @@ The Mamba-2 backbone, SSD scans, marker-delimiter coordinates and the Mamba chec
   - [x] AdamW with warmup × cosine decay and gradient clipping; custom numeric metrics (choice/noul accuracy, score MSE, per-task losses, selection loss).
   - [x] Early stopping and best-epoch checkpoint restore.
   - [x] Burn 0.21's `MetricCheckpointingStrategy` and `MetricEarlyStoppingStrategy` race the asynchronous metric processor: the current epoch is often missing from the store, so improving epochs were never saved. The store also caches the first (possibly partial) aggregate it computes per epoch. `LagTolerantCheckpointing` and `LagTolerantEarlyStopping` replace them, and an `EpochTracker` picks the final epoch. Epoch completeness is probed through a separate metric, so the decision metric is never cached while partial.
-- [x] **11.5 Artifact:** `burn-mamba/reflex-decision` v2 stores a Burn record of the reader and heads, with metadata binding it to the encoder SHA-256, the tokenizer SHA-256 and the encoding config. Loading refuses a mismatched encoder or tokenizer.
+- [x] **11.5 Artifact:** `burn-jev/reflex-decision` v2 stores a Burn record of the reader and heads, with metadata binding it to the encoder SHA-256, the tokenizer SHA-256 and the encoding config. Loading refuses a mismatched encoder or tokenizer.
 - [x] **11.6 Evaluation:** every report prints trivial baselines (uniform and longest-candidate choice, majority noul, mean-score RMSE) next to the model's numbers. `--reader-blocks 0` runs the probe ablation.
-

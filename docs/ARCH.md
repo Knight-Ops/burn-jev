@@ -19,7 +19,6 @@ The Mamba-2 backbone was replaced after the run documented in `verdict.md`, wher
   - Two pre-LN blocks of `cross-attn(query → context tokens) → FFN` follow.
   - Queries never attend to each other, so each item is read against the evidence independently.
   - `--reader-blocks 0` turns the reader into a mean-pool probe, used as an ablation.
-  - During training, `--ctx-token-drop p` (default 0.1) hides each real context token from the cross-attention keys with probability p. Validation and inference always see every token.
 - **Heads:** the four heads below read the reader output. The k-NN head reads the masked mean of the context tokens.
 - **Training:** Burn's native `SupervisedTraining` drives the loop, with the TUI when attached to a terminal (see `src/training/trainer.rs`).
   - Optimiser: AdamW, linear warmup × cosine decay, gradient clipping, dropout 0.1.

@@ -2,7 +2,7 @@
 //! artifact and emits one JSON verdict per input scenario.
 //!
 //! ```text
-//! reflex [--backend cpu|wgpu] --encoder <dir> --artifact <st> [--tokenizer <json>] [--input <jsonl>]   # stdin if omitted
+//! reflex [--backend cpu|wgpu|cuda] --encoder <dir> --artifact <st> [--tokenizer <json>] [--input <jsonl>]   # stdin if omitted
 //! ```
 //!
 //! Each input line is a [`ReflexRequest`] (dataset records work too; labels are ignored).
@@ -19,8 +19,8 @@ use clap::Parser;
 use serde::Serialize;
 use tokenizers::Tokenizer;
 
-use burn_mamba::backend::{BackendKind, CpuBackend, FlexDevice};
-use burn_mamba::{load_artifact, sha256_file, ModernBertLoader, ReflexEngine, ReflexRequest, ReflexVerdict};
+use burn_jev::backend::{BackendKind, CpuBackend, FlexDevice};
+use burn_jev::{load_artifact, sha256_file, ModernBertLoader, ReflexEngine, ReflexRequest, ReflexVerdict};
 
 #[derive(Parser)]
 #[command(version, about = "Run Tier 1 reflex inference over JSONL scenarios")]
@@ -68,7 +68,11 @@ fn dispatch(cli: Cli) -> Result<usize, Box<dyn std::error::Error>> {
         BackendKind::Cpu => run::<CpuBackend>(cli, FlexDevice),
         #[cfg(feature = "wgpu")]
         BackendKind::Wgpu => {
-            run::<burn_mamba::backend::GpuWgpu>(cli, burn_mamba::backend::WgpuDevice::default())
+            run::<burn_jev::backend::GpuWgpu>(cli, burn_jev::backend::WgpuDevice::default())
+        }
+        #[cfg(feature = "cuda")]
+        BackendKind::Cuda => {
+            run::<burn_jev::backend::GpuCuda>(cli, burn_jev::backend::CudaDevice::default())
         }
         #[allow(unreachable_patterns)]
         other => Err(other.not_compiled()),

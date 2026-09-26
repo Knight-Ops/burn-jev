@@ -1,6 +1,6 @@
 mod common;
 
-use burn_mamba::{ChoiceQuestionRequest, EncodingError, ItemKind, NoulQueryRequest, ReflexRequest, ScoreRubricRequest};
+use burn_jev::{ChoiceQuestionRequest, EncodingError, ItemKind, NoulQueryRequest, ReflexRequest, ScoreRubricRequest};
 use common::{tiny_encoding, tiny_tokenizer, CLS, SEP};
 
 fn request() -> ReflexRequest {

@@ -1,4 +1,4 @@
-use burn_mamba::{
+use burn_jev::{
     ChoiceQuestionRecord, EncodingConfig, JevDataset, JevScenarioRecord, NoulQueryRecord,
     ScoreRubricRecord,
 };

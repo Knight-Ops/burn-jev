@@ -1,6 +1,6 @@
 use burn::tensor::Tensor;
 use burn_flex::{Flex, FlexDevice};
-use burn_mamba::{
+use burn_jev::{
     ChoiceVerdict, Head, JevError, NoulVerdict, ScoreVerdict, UnifiedHeads, UnifiedHeadsConfig,
     MAX_CHOICE_CANDIDATES,
 };

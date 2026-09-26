@@ -16,11 +16,18 @@ pub use burn::backend::wgpu::WgpuDevice;
 #[cfg(feature = "wgpu")]
 pub type GpuWgpu = burn::backend::Wgpu;
 
+#[cfg(feature = "cuda")]
+pub use burn::backend::cuda::CudaDevice;
+/// NVIDIA CUDA backend.
+#[cfg(feature = "cuda")]
+pub type GpuCuda = burn::backend::Cuda;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
 pub enum BackendKind {
     #[default]
     Cpu,
     Wgpu,
+    Cuda,
 }
 
 impl BackendKind {
@@ -28,6 +35,7 @@ impl BackendKind {
         match self {
             BackendKind::Cpu => "cpu",
             BackendKind::Wgpu => "wgpu",
+            BackendKind::Cuda => "cuda",
         }
     }
 
@@ -36,6 +44,7 @@ impl BackendKind {
         let feature = match self {
             BackendKind::Cpu => "default",
             BackendKind::Wgpu => "wgpu",
+            BackendKind::Cuda => "cuda",
         };
         format!(
             "backend `{}` is not compiled into this binary; rebuild with `--features {feature}`",

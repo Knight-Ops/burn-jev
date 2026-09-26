@@ -1,6 +1,6 @@
 use burn::tensor::{Int, Tensor};
 use burn_flex::{Flex, FlexDevice};
-use burn_mamba::{
+use burn_jev::{
     benign_adversarial_metric_loss, brier_calibration_loss, choice_cross_entropy_loss,
     noul_bce_loss, ordinal_score_loss,
 };

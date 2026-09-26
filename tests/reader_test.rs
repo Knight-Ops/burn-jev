@@ -3,7 +3,7 @@ mod common;
 use burn::backend::Autodiff;
 use burn::tensor::{Bool, Int, Tensor, TensorData};
 use burn_flex::FlexDevice;
-use burn_mamba::{DecisionModelConfig, FeatureBatch, ItemKind, ScenarioFeatures};
+use burn_jev::{DecisionModelConfig, FeatureBatch, ItemKind, ScenarioFeatures};
 use common::{tiny_encoder_config, TestBackend, PAD};
 
 const D: usize = 16;
@@ -32,9 +32,9 @@ fn kinds() -> Vec<ItemKind> {
     ]
 }
 
-fn model() -> burn_mamba::DecisionModel<TestBackend> {
-    let reader = burn_mamba::ItemReaderConfig::new(D).with_d_reader(8).with_n_heads(2);
-    DecisionModelConfig::with_reader(reader, burn_mamba::UnifiedHeadsConfig::new(8)).init(&FlexDevice)
+fn model() -> burn_jev::DecisionModel<TestBackend> {
+    let reader = burn_jev::ItemReaderConfig::new(D).with_d_reader(8).with_n_heads(2);
+    DecisionModelConfig::with_reader(reader, burn_jev::UnifiedHeadsConfig::new(8)).init(&FlexDevice)
 }
 
 fn to_vec<const N: usize>(t: Tensor<TestBackend, N>) -> Vec<f32> {
@@ -90,8 +90,8 @@ fn decide_returns_normalized_verdicts_per_question() {
 #[test]
 fn gradients_reach_the_cross_attention() {
     type AD = Autodiff<TestBackend>;
-    let reader = burn_mamba::ItemReaderConfig::new(D).with_d_reader(8).with_n_heads(2);
-    let m = DecisionModelConfig::with_reader(reader, burn_mamba::UnifiedHeadsConfig::new(8)).init::<AD>(&FlexDevice);
+    let reader = burn_jev::ItemReaderConfig::new(D).with_d_reader(8).with_n_heads(2);
+    let m = DecisionModelConfig::with_reader(reader, burn_jev::UnifiedHeadsConfig::new(8)).init::<AD>(&FlexDevice);
     let a = features(4, 0.0, kinds());
     let out = m.forward(&FeatureBatch::new(&[&a], &FlexDevice));
     let grads = out.noul_logits.unwrap().sum().backward();
@@ -125,35 +125,4 @@ fn encoder_padding_does_not_change_real_tokens() {
     let b = to_vec(both.slice([0..1, 0..l_short]));
     let max_err = a.iter().zip(&b).map(|(x, y)| (x - y).abs()).fold(0.0f32, f32::max);
     assert!(max_err < 1e-4, "padding leaked into real tokens: {max_err}");
-}
-
-#[test]
-fn context_token_dropout_is_training_only() {
-    let reader = |p: f64| {
-        burn_mamba::ItemReaderConfig::new(D)
-            .with_d_reader(8)
-            .with_n_heads(2)
-            .with_dropout(0.0)
-            .with_ctx_token_drop(p)
-    };
-    let heads = burn_mamba::UnifiedHeadsConfig::new(8).with_dropout(0.0);
-    let a = features(12, 0.0, kinds());
-
-    // Without autodiff (validation, inference) every context token stays visible.
-    let m = DecisionModelConfig::with_reader(reader(0.5), heads.clone()).init::<TestBackend>(&FlexDevice);
-    let batch = FeatureBatch::new(&[&a], &FlexDevice);
-    // The forward materializes the lazy params, so the clone shares them.
-    let dropped = to_vec(m.forward(&batch).noul_logits.unwrap());
-    let mut m0 = m.clone();
-    m0.reader.ctx_token_drop = 0.0;
-    assert_eq!(dropped, to_vec(m0.forward(&batch).noul_logits.unwrap()));
-
-    // Under autodiff each forward hides a different random subset.
-    type AD = Autodiff<TestBackend>;
-    let m = DecisionModelConfig::with_reader(reader(0.5), heads).init::<AD>(&FlexDevice);
-    let batch = FeatureBatch::<AD>::new(&[&a], &FlexDevice);
-    let first = m.forward(&batch).noul_logits.unwrap().into_data().to_vec::<f32>().unwrap();
-    let second = m.forward(&batch).noul_logits.unwrap().into_data().to_vec::<f32>().unwrap();
-    assert!(first.iter().all(|v| v.is_finite()));
-    assert_ne!(first, second);
 }

@@ -1,8 +1,8 @@
 //! Post-hoc temperature fitting recovers a known over-confidence factor.
 
 use burn_flex::{Flex, FlexDevice};
-use burn_mamba::training::{fit_temperature, HeadLogits};
-use burn_mamba::Head;
+use burn_jev::training::{fit_temperature, HeadLogits};
+use burn_jev::Head;
 
 type B = Flex<f32, i32>;
 

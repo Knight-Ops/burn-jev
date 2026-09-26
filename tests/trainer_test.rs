@@ -4,7 +4,7 @@
 
 use burn::backend::Autodiff;
 use burn_flex::{Flex, FlexDevice};
-use burn_mamba::{
+use burn_jev::{
     train_decision_model, CachedScenario, DecisionModelConfig, ItemKind, ItemReaderConfig, MultiQuestionTargets,
     ScenarioFeatures, TrainConfig, UnifiedHeadsConfig,
 };
@@ -69,7 +69,7 @@ fn native_trainer_learns_a_cross_attention_task_and_restores_the_best_epoch() {
 
     let reader = ItemReaderConfig::new(D).with_d_reader(32).with_n_heads(4).with_dropout(0.0);
     let model_config = DecisionModelConfig::with_reader(reader, UnifiedHeadsConfig::new(32).with_dropout(0.0));
-    let run_dir = std::env::temp_dir().join(format!("burn_mamba_trainer_test_{}", std::process::id()));
+    let run_dir = std::env::temp_dir().join(format!("burn_jev_trainer_test_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&run_dir);
     let config = TrainConfig {
         epochs: 30,

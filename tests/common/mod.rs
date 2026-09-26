@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use burn_flex::Flex;
-use burn_mamba::{EncodingConfig, ModernBertConfig};
+use burn_jev::{EncodingConfig, ModernBertConfig};
 use tokenizers::models::wordlevel::WordLevel;
 use tokenizers::pre_tokenizers::whitespace::Whitespace;
 use tokenizers::Tokenizer;
